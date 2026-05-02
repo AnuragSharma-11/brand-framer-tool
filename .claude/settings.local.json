@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"import\\('./api/generate.js'\\).then\\(\\(\\) => console.log\\('✓ api/generate.js loads OK'\\)\\).catch\\(e => { console.error\\('✗', e.message\\); process.exit\\(1\\) }\\)\")",
+      "Bash(OPENAI_API_KEY=test-key node -e \"import\\('./api/generate.js'\\).then\\(\\(\\) => console.log\\('✓ api/generate.js loads OK'\\)\\).catch\\(e => { console.error\\('✗', e.message\\); process.exit\\(1\\) }\\)\")",
+      "Bash(npx vercel *)",
+      "Bash(xxd .env)",
+      "Bash(awk '{print $2, $3}')",
+      "Bash(awk -F'=' '{print $1\"=<HIDDEN>\"}' .env)"
+    ]
+  }
+}

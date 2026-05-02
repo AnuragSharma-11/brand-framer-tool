@@ -1,11 +1,92 @@
 html, body, #root {
   margin: 0;
-  height: 100%;
   width: 100%;
   font-family: system-ui, sans-serif;
-  overflow: hidden;
+}
+
+/* Animated atmospheric background — subtle breathing radial gradient */
+body {
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, #2a1a3e 0%, transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 100%, #1a0e2a 0%, transparent 70%),
+    linear-gradient(180deg, #0a0810 0%, #050309 100%);
+  background-attachment: fixed;
+  background-size: 100% 200%, 100% 200%, 100% 100%;
+  animation: ambient-shift 18s ease-in-out infinite;
+}
+
+@keyframes ambient-shift {
+  0%, 100% { background-position: 50% 0%, 50% 100%, 0 0; }
+  50%      { background-position: 60% 5%,  40% 95%, 0 0; }
+}
+
+#root {
+  min-height: 100%;
+}
+
+section.scene-section {
+  height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+/* Section 2 cinematic mount reveal — fades up + scales in */
+section.scene-section.is-output {
+  animation: section-reveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes section-reveal {
+  0%   { opacity: 0; transform: translateY(40px) scale(0.97); filter: blur(10px); }
+  100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
+}
+
+/* First section subtle entrance on page load */
+section.scene-section.is-input {
+  animation: section-fade-in 1.2s ease-out both;
+}
+
+@keyframes section-fade-in {
+  0%   { opacity: 0; transform: translateY(15px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Subtle floating particles overlay (purist atmospheric haze) */
+section.scene-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(180, 108, 255, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(180, 108, 255, 0.05) 0%, transparent 40%);
+  mix-blend-mode: screen;
+  animation: haze-drift 14s ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+@keyframes haze-drift {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(-12px, 8px); }
 }
 
 canvas {
   display: block;
+  position: relative;
+  z-index: 2;
 }
+
+/* Smooth scroll fallback (custom JS animation handles the actual cinematic scroll) */
+html {
+  scroll-behavior: auto;
+}
+
+/* Custom global scrollbar — premium subtle */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(180, 108, 255, 0.2);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(180, 108, 255, 0.4); }
+* { scrollbar-width: thin; scrollbar-color: rgba(180, 108, 255, 0.2) transparent; }
