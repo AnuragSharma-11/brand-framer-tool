@@ -150,7 +150,6 @@ function Model() {
       {info && (
         <Html
           transform
-          occlude
           position={[
             info.offset.x,
             info.offset.y + 0.27,
