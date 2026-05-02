@@ -1,4 +1,11 @@
-body {
+html, body, #root {
   margin: 0;
+  height: 100%;
+  width: 100%;
   font-family: system-ui, sans-serif;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
 }
