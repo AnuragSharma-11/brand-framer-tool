@@ -2,6 +2,14 @@ html, body, #root {
   margin: 0;
   width: 100%;
   font-family: system-ui, sans-serif;
+  /* Dark base color — applied before gradient loads, prevents white flash on refresh */
+  background-color: #050309;
+}
+
+/* Lock body scroll at load — hero is 100vh, no scroll needed.
+   App.jsx unlocks/re-locks programmatically when Section 2 / 3 reveal. */
+body {
+  overflow: hidden;
 }
 
 /* Animated atmospheric background — subtle breathing radial gradient */
@@ -30,23 +38,32 @@ section.scene-section {
   position: relative;
 }
 
-/* Section 2 cinematic mount reveal — fades up + scales in */
+/* Section 2 cinematic mount reveal — fades up + scales in (longer + softer for luxury feel) */
 section.scene-section.is-output {
-  animation: section-reveal 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: section-reveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Section 3 (projects) — same cinematic reveal pattern */
+section.scene-section.is-projects {
+  animation: section-reveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @keyframes section-reveal {
-  0%   { opacity: 0; transform: translateY(40px) scale(0.97); filter: blur(10px); }
+  0%   { opacity: 0; transform: translateY(50px) scale(0.94); filter: blur(14px); }
+  60%  { opacity: 0.7; }
   100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
 }
 
 /* First section subtle entrance on page load */
 section.scene-section.is-input {
-  animation: section-fade-in 1.2s ease-out both;
+  animation: section-fade-in 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes section-fade-in {
-  0%   { opacity: 0; transform: translateY(15px); }
+  0%   { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 
@@ -78,6 +95,37 @@ canvas {
 /* Smooth scroll fallback (custom JS animation handles the actual cinematic scroll) */
 html {
   scroll-behavior: auto;
+}
+
+/* Quiz step content transition — fade + slight slide on each step change */
+.quiz-step-body {
+  animation: step-fade-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes step-fade-in {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ResultUI section reveal — staggered entrance for each block */
+.result-block {
+  animation: result-block-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.result-block:nth-child(1) { animation-delay: 0.0s; }
+.result-block:nth-child(2) { animation-delay: 0.1s; }
+.result-block:nth-child(3) { animation-delay: 0.2s; }
+.result-block:nth-child(4) { animation-delay: 0.35s; }
+@keyframes result-block-in {
+  0%   { opacity: 0; transform: translateX(-6px); filter: blur(4px); }
+  100% { opacity: 1; transform: translateX(0);    filter: blur(0); }
+}
+
+/* Hero particles — slow drifting + twinkle */
+@keyframes particle-float {
+  0%   { transform: translate(0, 0)              scale(0.6); opacity: 0; }
+  20%  { opacity: 1; }
+  50%  { transform: translate(var(--drift, 8px), -22px) scale(1); opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translate(0, -44px)          scale(0.6); opacity: 0; }
 }
 
 /* Custom global scrollbar — premium subtle */
