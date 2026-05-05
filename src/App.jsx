@@ -364,7 +364,7 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
     industry: "",   // Q2
     url: "",   // Q3 (input)
     businessAge: "",   // Q4
-    hurt: "",   // Q5
+    hurt: [],   // Q5 — multi-select array
     need: "",   // Q6
     recentChange: "",   // Q7 (input)
   })
@@ -384,9 +384,35 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
     next()
   }
 
+  // Toggle a Q5 (hurt) option. Picking "I don't know" selects EVERYTHING (auto-select-all).
+  // Picking it again clears all. Picking any other option while all-selected drops "I don't know".
+  const toggleHurt = (option) => {
+    setData((d) => {
+      const cur = Array.isArray(d.hurt) ? d.hurt : []
+      if (option === "I don't know") {
+        // If already on, deselect all. Otherwise, select every option.
+        return { ...d, hurt: cur.includes(option) ? [] : [...HURT_OPTS] }
+      }
+      // Standard toggle for other options
+      let next = cur.includes(option)
+        ? cur.filter((x) => x !== option)
+        : [...cur, option]
+      // If "I don't know" is set but not every option is selected, remove it
+      if (next.includes("I don't know") && next.length < HURT_OPTS.length) {
+        next = next.filter((x) => x !== "I don't know")
+      }
+      return { ...d, hurt: next }
+    })
+  }
+
   // Trigger AI generation in the parent (Scene), then advance to "transmitted" screen
   const submitAndAdvance = () => {
-    onGenerate?.(data)
+    const cleaned = {
+      ...data,
+      // Backend expects a string — join multi-select array
+      hurt: Array.isArray(data.hurt) ? data.hurt.join(", ") : data.hurt,
+    }
+    onGenerate?.(cleaned)
     setStep(8)
   }
 
@@ -479,10 +505,28 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
           <OptionRow key={o} label={o} selected={data.businessAge === o} onClick={() => handleSelect("businessAge", o)} />
         ))}
 
-        {/* Q5 — Pain point */}
-        {step === 5 && HURT_OPTS.map((o) => (
-          <OptionRow key={o} label={o} selected={data.hurt === o} onClick={() => handleSelect("hurt", o)} />
-        ))}
+        {/* Q5 — Pain point (MULTI-SELECT). NEXT button lives in the footer (mirrors BACK). */}
+        {step === 5 && (
+          <>
+            <div style={{
+              fontSize: 10,
+              color: TEXT_DIM,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 2,
+            }}>
+              Select all that apply
+            </div>
+            {HURT_OPTS.map((o) => (
+              <OptionRow
+                key={o}
+                label={o}
+                selected={(data.hurt || []).includes(o)}
+                onClick={() => toggleHurt(o)}
+              />
+            ))}
+          </>
+        )}
 
         {/* Q6 — What do you need */}
         {step === 6 && NEED_OPTS.map((o) => (
@@ -577,7 +621,37 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
           ))}
         </div>
 
-        <div />
+        {/* Right slot — only used by Q5 multi-select to advance */}
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          {step === 5 && (
+            <button
+              onClick={() => {
+                if (!(data.hurt || []).length) return
+                playSelect()
+                next()
+              }}
+              disabled={!(data.hurt || []).length}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: (data.hurt || []).length ? ACCENT : TEXT_DIM,
+                cursor: (data.hurt || []).length ? "pointer" : "not-allowed",
+                padding: 0,
+                fontSize: 11,
+                fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                letterSpacing: "0.04em",
+                opacity: (data.hurt || []).length ? 1 : 0.5,
+                transition: "color 0.15s, opacity 0.15s",
+              }}
+            >
+              NEXT
+              <Chevron color={(data.hurt || []).length ? ACCENT : TEXT_DIM} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1308,7 +1382,7 @@ function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color =
 }
 
 /* ---------------- INPUT SCENE — single GLB device with QuizUI ---------------- */
-function InputScene({ onGenerate, loading, spinRef }) {
+function InputScene({ onGenerate, loading, spinRef, quizKey = 0 }) {
   return (
     <>
       <ambientLight intensity={0.35} />
@@ -1330,6 +1404,7 @@ function InputScene({ onGenerate, loading, spinRef }) {
           spinRef={spinRef}
         >
           <QuizUI
+            key={quizKey}
             onAdvance={() => spinRef?.current?.(1)}
             onGenerate={onGenerate}
             loading={loading}
@@ -1599,6 +1674,422 @@ function ProjectCard({ project, index }) {
   )
 }
 
+/* ---------------- SERVICES SECTION — "What We Do" grid (Section 4) ---------------- */
+const SERVICES = {
+  brand: {
+    title: "Brand Intelligence",
+    tags: ["POSITIONING", "NARRATIVE", "STRATEGY", "BRAND ARCHITECTURE"],
+    description: "We decode your business, audience, and positioning to build a foundation rooted in insight and clarity.",
+  },
+  experience: {
+    title: "Experience Design",
+    tags: ["UX STRATEGY", "UI SYSTEMS", "PROTOTYPING", "INTERACTION DESIGN"],
+    description: "We design intuitive, conversion-driven experiences that guide users effortlessly and drive action.",
+  },
+  digital: {
+    title: "Digital Product",
+    tags: ["WEB DEVELOPMENT", "CMS SYSTEMS", "PERFORMANCE OPTIMIZATION", "INTEGRATIONS"],
+    description: "We build fast, scalable, and reliable products engineered for real-world performance.",
+  },
+  visual: {
+    title: "Visual Systems",
+    tags: ["LOGO", "TYPOGRAPHY", "COLOUR SYSTEMS", "MOTION & ASSETS"],
+    description: "We craft cohesive visual languages that scale across platforms and create lasting recognition.",
+  },
+}
+
+function ServiceTag({ children, light = false }) {
+  return (
+    <span style={{
+      display: "inline-block",
+      padding: "7px 14px",
+      borderRadius: 999,
+      background: light ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.06)",
+      border: `1px solid ${light ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)"}`,
+      color: light ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.78)",
+      fontSize: 11,
+      fontWeight: 500,
+      letterSpacing: "0.06em",
+      textTransform: "uppercase",
+      whiteSpace: "nowrap",
+      backdropFilter: "blur(2px)",
+      WebkitBackdropFilter: "blur(2px)",
+    }}>
+      {children}
+    </span>
+  )
+}
+
+function ServicesSection() {
+  // Reusable card visual base
+  const cardBaseStyle = {
+    position: "relative",
+    borderRadius: 22,
+    overflow: "hidden",
+    boxSizing: "border-box",
+    display: "flex",
+    flexDirection: "column",
+  }
+  const titleLg = {
+    margin: 0,
+    fontSize: "clamp(24px, 2.1vw, 32px)",
+    fontWeight: 500,
+    color: "#ffffff",
+    fontFamily: "'Inter Tight', system-ui, sans-serif",
+    letterSpacing: "-0.025em",
+    lineHeight: 1.05,
+  }
+  const titleMd = {
+    ...titleLg,
+    fontSize: "clamp(20px, 1.7vw, 26px)",
+  }
+  const descStyle = {
+    margin: 0,
+    color: "rgba(255, 255, 255, 0.82)",
+    fontSize: 13,
+    lineHeight: 1.55,
+    fontFamily: "'Inter Tight', system-ui, sans-serif",
+    fontWeight: 400,
+  }
+
+  return (
+    <div style={{
+      width: "100%",
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: "80px 32px 60px",
+      boxSizing: "border-box",
+      position: "relative",
+      zIndex: 3,
+    }}>
+      {/* ─── HEADER ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-15%" }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        style={{ textAlign: "center", marginBottom: 56 }}
+      >
+        <div style={{
+          color: "#e63d2b",
+          fontSize: 11,
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          fontWeight: 500,
+          marginBottom: 22,
+          fontFamily: "'Inter Tight', system-ui, sans-serif",
+        }}>
+          What We Do
+        </div>
+        <h2 style={{
+          margin: 0,
+          fontSize: "clamp(36px, 5vw, 76px)",
+          fontWeight: 500,
+          color: "#ffffff",
+          lineHeight: 1.02,
+          letterSpacing: "-0.03em",
+          fontFamily: "'Inter Tight', system-ui, sans-serif",
+        }}>
+          We Engineer{" "}
+          <em style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontStyle: "italic",
+            fontWeight: 400,
+          }}>
+            High-Performance Design
+          </em>
+        </h2>
+      </motion.div>
+
+      {/* ─── TOP ROW: Brand Intelligence (wide) + Experience Design ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 32 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-8%" }}
+        transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1.45fr 1fr",
+          gap: 16,
+          marginBottom: 16,
+        }}
+      >
+        {/* ━━━ BRAND INTELLIGENCE — large red card with 3D logo ━━━ */}
+        <div style={{
+          ...cardBaseStyle,
+          background: "radial-gradient(ellipse 95% 110% at 80% 20%, #db302a 0%, #b22420 30%, #761816 60%, #480d0d 100%)",
+          minHeight: 320,
+          padding: "32px 36px",
+          justifyContent: "space-between",
+        }}>
+          {/* Bottom-left dot pattern */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "radial-gradient(rgba(255, 255, 255, 0.10) 1.2px, transparent 1.4px)",
+            backgroundSize: "12px 12px",
+            maskImage: "radial-gradient(ellipse 60% 70% at 0% 100%, rgba(0,0,0,0.85) 0%, transparent 60%)",
+            WebkitMaskImage: "radial-gradient(ellipse 60% 70% at 0% 100%, rgba(0,0,0,0.85) 0%, transparent 60%)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
+
+          {/* 3D logo — top-right corner, slightly extending past edges */}
+          <img
+            src="/services/service-brand-logo.png"
+            alt=""
+            style={{
+              position: "absolute",
+              right: -10,
+              top: -20,
+              width: "38%",
+              maxWidth: 280,
+              height: "auto",
+              pointerEvents: "none",
+              userSelect: "none",
+              zIndex: 2,
+              filter: "drop-shadow(-8px 14px 24px rgba(0,0,0,0.45))",
+            }}
+          />
+
+          <div style={{ position: "relative", zIndex: 3, maxWidth: "72%" }}>
+            <h3 style={{ ...titleLg, marginBottom: 18 }}>{SERVICES.brand.title}</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {SERVICES.brand.tags.map((t) => <ServiceTag key={t} light>{t}</ServiceTag>)}
+            </div>
+          </div>
+
+          <p style={{
+            ...descStyle,
+            position: "relative",
+            zIndex: 3,
+            maxWidth: 380,
+            color: "rgba(255, 255, 255, 0.94)",
+          }}>
+            {SERVICES.brand.description}
+          </p>
+        </div>
+
+        {/* ━━━ EXPERIENCE DESIGN — dark card with phone mockup ━━━ */}
+        <div style={{
+          ...cardBaseStyle,
+          background: "#0c0c0c",
+          border: "1px solid rgba(255, 255, 255, 0.05)",
+          minHeight: 320,
+          padding: "32px 32px",
+          justifyContent: "space-between",
+        }}>
+          {/* Subtle checkered/grid background — visible on left side */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+            `,
+            backgroundSize: "48px 48px",
+            backgroundPosition: "left center",
+            maskImage: "radial-gradient(ellipse 70% 80% at 25% 50%, rgba(0,0,0,1) 0%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse 70% 80% at 25% 50%, rgba(0,0,0,1) 0%, transparent 80%)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
+
+          {/* Phone mockup — right side, no rotation, slightly off bottom-right */}
+          <img
+            src="/services/service-phone-mockup.png"
+            alt=""
+            style={{
+              position: "absolute",
+              right: -25,
+              bottom: -30,
+              width: 200,
+              height: "auto",
+              pointerEvents: "none",
+              userSelect: "none",
+              zIndex: 2,
+              filter: "drop-shadow(-15px 22px 32px rgba(0,0,0,0.55))",
+            }}
+          />
+
+          {/* Top: description */}
+          <p style={{
+            ...descStyle,
+            position: "relative",
+            zIndex: 3,
+            maxWidth: 280,
+          }}>
+            {SERVICES.experience.description}
+          </p>
+
+          {/* Bottom: title + tags */}
+          <div style={{ position: "relative", zIndex: 3, maxWidth: 290 }}>
+            <h3 style={{ ...titleMd, marginBottom: 16 }}>{SERVICES.experience.title}</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {SERVICES.experience.tags.map((t) => <ServiceTag key={t}>{t}</ServiceTag>)}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ─── BOTTOM ROW: Digital Product + Visual Systems + All Services ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 32 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-8%" }}
+        transition={{ duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 16,
+        }}
+      >
+        {/* ━━━ DIGITAL PRODUCT — orange/yellow glow ━━━ */}
+        <div style={{
+          ...cardBaseStyle,
+          background: "#0a0907",
+          minHeight: 280,
+          padding: "28px 26px",
+          justifyContent: "space-between",
+        }}>
+          {/* Yellow/orange glow from bottom area */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            background: "radial-gradient(ellipse 130% 95% at 35% 110%, #f0a81c 0%, #c87014 22%, #4a230a 50%, #100805 78%, transparent 100%)",
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
+          {/* Subtle grain */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 0.5px, transparent 0.6px)",
+            backgroundSize: "3px 3px",
+            opacity: 0.5,
+            pointerEvents: "none",
+            zIndex: 2,
+          }} />
+
+          <div style={{ position: "relative", zIndex: 3 }}>
+            <h3 style={{ ...titleMd, marginBottom: 18 }}>{SERVICES.digital.title}</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {SERVICES.digital.tags.map((t) => <ServiceTag key={t} light>{t}</ServiceTag>)}
+            </div>
+          </div>
+          <p style={{ ...descStyle, position: "relative", zIndex: 3, maxWidth: 280 }}>
+            {SERVICES.digital.description}
+          </p>
+        </div>
+
+        {/* ━━━ VISUAL SYSTEMS — dark + topographic pattern ━━━ */}
+        <div style={{
+          ...cardBaseStyle,
+          background: "#0a0a0a",
+          border: "1px solid rgba(255, 255, 255, 0.05)",
+          minHeight: 280,
+          padding: "28px 26px",
+          justifyContent: "space-between",
+        }}>
+          {/* Topo pattern overlay — slightly more subtle */}
+          <div style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "url(/services/service-topo-pattern.png)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            opacity: 0.5,
+            pointerEvents: "none",
+            zIndex: 1,
+          }} />
+
+          <div style={{ position: "relative", zIndex: 3 }}>
+            <h3 style={{ ...titleMd, marginBottom: 18 }}>{SERVICES.visual.title}</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {SERVICES.visual.tags.map((t) => <ServiceTag key={t}>{t}</ServiceTag>)}
+            </div>
+          </div>
+          <p style={{ ...descStyle, position: "relative", zIndex: 3, maxWidth: 280 }}>
+            {SERVICES.visual.description}
+          </p>
+        </div>
+
+        {/* ━━━ ALL SERVICES — wave at top + title + CTA ━━━ */}
+        <div style={{
+          ...cardBaseStyle,
+          background: "#0a0a0a",
+          border: "1px solid rgba(255, 255, 255, 0.05)",
+          minHeight: 280,
+          padding: 0,
+        }}>
+          {/* Wave at top */}
+          <div style={{
+            width: "100%",
+            height: 130,
+            backgroundImage: "url(/services/service-wave.png)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            position: "relative",
+          }}>
+            <div style={{
+              position: "absolute",
+              inset: 0,
+              background: "linear-gradient(180deg, transparent 55%, #0a0a0a 100%)",
+              pointerEvents: "none",
+            }} />
+          </div>
+
+          {/* Lower content */}
+          <div style={{
+            flex: 1,
+            padding: "0 24px 22px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+            gap: 20,
+          }}>
+            <h3 style={{ ...titleMd, marginTop: 8 }}>All Services</h3>
+            <a
+              href={CALL_BOOKING_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#fce5d8"; playHover() }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#f4dbcd" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 12,
+                background: "#f4dbcd",
+                color: "#0e0e0e",
+                padding: "16px 24px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: "0.22em",
+                textTransform: "uppercase",
+                textDecoration: "none",
+                fontFamily: "'Inter Tight', system-ui, sans-serif",
+                transition: "background 0.25s",
+              }}
+            >
+              <span style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: "#0e0e0e",
+                display: "inline-block",
+              }} />
+              Talk to us
+            </a>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 /* ---------------- ANIMATED HEADLINE — character-by-character reveal on mount ---------------- */
 function AnimatedHeadline() {
   const lines = [
@@ -1777,11 +2268,22 @@ export default function App() {
   const outputSectionRef = useRef(null)
   const projectsSectionRef = useRef(null)
 
+  // Increment to force a fresh QuizUI mount (clears internal step state)
+  const [quizKey, setQuizKey] = useState(0)
+
   // 🔒 Lock body scroll at the deepest revealed section. Re-locks on each new section reveal.
+  // NOTE: explicit "auto" (not "") is required to override the CSS `body { overflow: hidden }`
+  // rule that prevents the scrollbar-flash on initial load.
   useEffect(() => {
-    if (showResult || showProjects) {
+    if (showProjects) {
+      // Once projects + services reveal, leave scroll permanently unlocked so user
+      // can naturally scroll down to the services section.
+      document.body.style.overflow = "auto"
+      return
+    }
+    if (showResult) {
       // Unlock so the cinematic scroll can run
-      document.body.style.overflow = ""
+      document.body.style.overflow = "auto"
       // Re-lock once scroll animation finishes (900ms delay + 3000ms scroll + buffer)
       const timer = setTimeout(() => {
         document.body.style.overflow = "hidden"
@@ -1829,6 +2331,26 @@ export default function App() {
   const handleRetry = useCallback(() => {
     if (lastAnswers) handleGenerate(lastAnswers)
   }, [lastAnswers, handleGenerate])
+
+  const handleReset = useCallback(() => {
+    playSelect()
+    // Smooth scroll back to the top first
+    smoothScrollToElement(() => document.body, { delay: 0, duration: 1800 })
+    // Clear all state shortly after the scroll begins so the user sees the hero re-emerge clean
+    setTimeout(() => {
+      setReport(null)
+      setLoading(false)
+      setError(null)
+      setLastAnswers(null)
+      setShowResult(false)
+      setShowProjects(false)
+      setContact({ name: "", email: "" })
+      setSent(false)
+      setSending(false)
+      setSendError(null)
+      setQuizKey((k) => k + 1)   // remount QuizUI → resets to step 1
+    }, 1900)
+  }, [])
 
   const handleSendEmail = useCallback(async (e) => {
     e?.preventDefault?.()
@@ -1885,6 +2407,7 @@ export default function App() {
             onGenerate={handleGenerate}
             loading={loading}
             spinRef={inputSpinRef}
+            quizKey={quizKey}
           />
         </Canvas>
 
@@ -2003,6 +2526,45 @@ export default function App() {
               onSendEmail={handleSendEmail}
             />
           </Canvas>
+
+          {/* Reset button — DOM overlay (model untouched). Sends user back to step 1. */}
+          <motion.button
+            onClick={handleReset}
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180, 108, 255, 0.18)"; e.currentTarget.style.borderColor = "rgba(180, 108, 255, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
+            style={{
+              position: "absolute",
+              top: 24,
+              left: 32,
+              zIndex: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 16px",
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              borderRadius: 999,
+              fontSize: 12,
+              fontFamily: "'Inter Tight', system-ui, sans-serif",
+              fontWeight: 500,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: "rgba(255, 255, 255, 0.7)",
+              cursor: "pointer",
+              transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Start Over
+          </motion.button>
         </section>
       )}
 
@@ -2010,6 +2572,13 @@ export default function App() {
       {showProjects && (
         <section className="scene-section is-projects" ref={projectsSectionRef}>
           <ProjectsSection />
+        </section>
+      )}
+
+      {/* SECTION 4: SERVICES (What We Do) — mounts together with projects */}
+      {showProjects && (
+        <section className="services-wrap is-services">
+          <ServicesSection />
         </section>
       )}
     </>

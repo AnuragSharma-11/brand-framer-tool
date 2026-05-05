@@ -57,14 +57,16 @@ section.scene-section.is-projects {
   100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
 }
 
-/* First section subtle entrance on page load */
+/* First section subtle entrance on page load — short so it doesn't hold the
+   inner framer animations behind it. Use `forwards` (not `both`) so the section
+   isn't pre-hidden longer than necessary on refresh. */
 section.scene-section.is-input {
-  animation: section-fade-in 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: section-fade-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes section-fade-in {
-  0%   { opacity: 0; transform: translateY(20px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 /* Subtle floating particles overlay (purist atmospheric haze) */
@@ -117,6 +119,20 @@ html {
 @keyframes result-block-in {
   0%   { opacity: 0; transform: translateX(-6px); filter: blur(4px); }
   100% { opacity: 1; transform: translateX(0);    filter: blur(0); }
+}
+
+/* Services section — content-driven height, simple fade-up entrance */
+section.services-wrap {
+  width: 100%;
+  position: relative;
+  background: #000000;
+}
+section.services-wrap.is-services {
+  animation: services-section-in 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes services-section-in {
+  0%   { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* Hero particles — slow drifting + twinkle */
