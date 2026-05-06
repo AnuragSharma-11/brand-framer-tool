@@ -832,18 +832,22 @@ function PriorityRow({ num, title, description, severity }) {
   )
 }
 
-function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail }) {
+function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail, isMobile = false }) {
   const isStandby = !report && !loading && !error
   // Truncate long text to keep layout clean
   const truncate = (s, n) => (s && s.length > n ? s.slice(0, n - 1).trim() + "…" : s)
 
+  // Portrait dimensions on mobile so the UI fills the portrait tablet screen
+  const uiW = isMobile ? 480 : RESULT_UI_W
+  const uiH = isMobile ? 600 : RESULT_UI_H
+
   return (
     <div style={{
-      width: RESULT_UI_W,
-      height: RESULT_UI_H,
+      width: uiW,
+      height: uiH,
       background: BG,
       color: TEXT_PRIMARY,
-      padding: "14px 18px",
+      padding: isMobile ? "20px 22px" : "14px 18px",
       borderRadius: 12,
       fontFamily: "system-ui, -apple-system, sans-serif",
       fontSize: 12,
@@ -1071,6 +1075,7 @@ function TabletDevice({
   children,
   glowColor = "#b46cff",
   glowIntensity = 1.4,
+  isMobile = false,
 }) {
   // Gentle floating + tilt animation, plus entrance scale-up
   const groupRef = useRef()
@@ -1100,13 +1105,14 @@ function TabletDevice({
     }
   })
   // 📐 Body dimensions (world units) — physical tablet shape
-  const BODY_W = 3.6      // 👈 tablet body WIDTH
-  const BODY_H = 2.3      // 👈 tablet body HEIGHT
-  const BODY_D = 0.18     // 👈 tablet body DEPTH (thickness)
+  // On mobile: portrait-friendly aspect (taller, narrower) to fit phone viewport
+  const BODY_W = isMobile ? 2.3 : 3.6      // 👈 tablet body WIDTH
+  const BODY_H = isMobile ? 2.8 : 2.3      // 👈 tablet body HEIGHT
+  const BODY_D = 0.18                       // 👈 tablet body DEPTH (thickness)
 
   // 📐 Screen plane (the lime/glow rectangle) — should be smaller than body to show bezel
-  const SCREEN_W = 3.2    // 👈 screen WIDTH
-  const SCREEN_H = 1.95   // 👈 screen HEIGHT
+  const SCREEN_W = isMobile ? 2.0 : 3.2    // 👈 screen WIDTH
+  const SCREEN_H = isMobile ? 2.5 : 1.95   // 👈 screen HEIGHT
 
   // 📐 Z offsets — how far in front of the body face elements sit
   const SCREEN_Z = BODY_D / 12 + 0.001   // 👈 screen mesh Z (positive = forward / sticks out, negative = recessed into body)
@@ -1263,12 +1269,16 @@ function TabletDevice({
         decay={2.5}
       />
 
-      {/* Html overlay — sits in front of glass layer */}
+      {/* Html overlay — sits in front of glass layer.
+          UI dimensions match what ResultUI renders (landscape vs portrait by isMobile). */}
       <Html
         transform
         occlude
         position={[0, 0, HTML_Z]}
-        scale={Math.min(SCREEN_W / RESULT_UI_W, SCREEN_H / RESULT_UI_H) * TABLET_SCREEN_FILL}
+        scale={Math.min(
+          SCREEN_W / (isMobile ? 480 : RESULT_UI_W),
+          SCREEN_H / (isMobile ? 600 : RESULT_UI_H)
+        ) * TABLET_SCREEN_FILL}
       >
         {children}
       </Html>
@@ -1466,7 +1476,9 @@ function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color =
 }
 
 /* ---------------- INPUT SCENE — single GLB device with QuizUI ---------------- */
-function InputScene({ onGenerate, loading, spinRef, quizKey = 0 }) {
+function InputScene({ onGenerate, loading, spinRef, quizKey = 0, isMobile = false }) {
+  // On mobile, push the device up so hero text below has room to breathe (Contra-style layout)
+  const deviceY = isMobile ? 0.55 : 0
   return (
     <>
       <ambientLight intensity={0.35} />
@@ -1483,7 +1495,7 @@ function InputScene({ onGenerate, loading, spinRef, quizKey = 0 }) {
 
       <Suspense fallback={<FallbackBox />}>
         <Device
-          position={[0, 0, 0]}
+          position={[0, deviceY, 0]}
           glowColor="#b46cff"
           spinRef={spinRef}
         >
@@ -1497,7 +1509,7 @@ function InputScene({ onGenerate, loading, spinRef, quizKey = 0 }) {
       </Suspense>
 
       <ContactShadows
-        position={[0, -1.4, 0]}
+        position={[0, -1.4 + deviceY, 0]}
         opacity={0.55}
         scale={8}
         blur={2.4}
@@ -1515,6 +1527,7 @@ function InputScene({ onGenerate, loading, spinRef, quizKey = 0 }) {
         rotateSpeed={0.7}
         minPolarAngle={Math.PI / 3.5}
         maxPolarAngle={Math.PI / 1.8}
+        target={[0, deviceY, 0]}
       />
     </>
   )
@@ -1547,8 +1560,8 @@ function OutputScene({ report, loading, error, onRetry, contact, setContact, sen
     <>
       {/* Camera intro — dollies from far → close on mount for cinematic reveal */}
       <CameraIntro
-        from={isMobile ? [0, 0.4, 9.0] : [0, 0.6, 7.5]}
-        to={isMobile ? [0, 0.1, 5.4] : [0, 0.1, 4.0]}
+        from={isMobile ? [0, 0.3, 8.5] : [0, 0.6, 7.5]}
+        to={isMobile ? [0, 0.05, 5.4] : [0, 0.1, 4.0]}
         duration={1.8}
       />
 
@@ -1563,7 +1576,7 @@ function OutputScene({ report, loading, error, onRetry, contact, setContact, sen
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
-      <TabletDevice position={[0, 0, 0]} glowColor="#b46cff">
+      <TabletDevice position={[0, 0, 0]} glowColor="#b46cff" isMobile={isMobile}>
         <ResultUI
           report={report}
           loading={loading}
@@ -1575,6 +1588,7 @@ function OutputScene({ report, loading, error, onRetry, contact, setContact, sen
           sending={sending}
           sendError={sendError}
           onSendEmail={onSendEmail}
+          isMobile={isMobile}
         />
       </TabletDevice>
 
@@ -1858,25 +1872,25 @@ function ServicesSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-15%" }}
         transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-        style={{ textAlign: "center", marginBottom: 56 }}
+        style={{ textAlign: "center", marginBottom: isMobile ? 36 : 56 }}
       >
         <div style={{
           color: "#e63d2b",
-          fontSize: 11,
+          fontSize: isMobile ? 10 : 11,
           letterSpacing: "0.28em",
           textTransform: "uppercase",
           fontWeight: 500,
-          marginBottom: 22,
+          marginBottom: isMobile ? 14 : 22,
           fontFamily: "'Inter Tight', system-ui, sans-serif",
         }}>
           What We Do
         </div>
         <h2 style={{
           margin: 0,
-          fontSize: "clamp(36px, 5vw, 76px)",
+          fontSize: isMobile ? "clamp(26px, 7vw, 36px)" : "clamp(36px, 5vw, 76px)",
           fontWeight: 500,
           color: "#ffffff",
-          lineHeight: 1.02,
+          lineHeight: 1.05,
           letterSpacing: "-0.03em",
           fontFamily: "'Inter Tight', system-ui, sans-serif",
         }}>
@@ -1908,8 +1922,8 @@ function ServicesSection() {
         <div style={{
           ...cardBaseStyle,
           background: "radial-gradient(ellipse 95% 110% at 80% 20%, #db302a 0%, #b22420 30%, #761816 60%, #480d0d 100%)",
-          minHeight: 270,
-          padding: "26px 32px",
+          minHeight: isMobile ? 220 : 270,
+          padding: isMobile ? "22px 22px" : "26px 32px",
           justifyContent: "space-between",
         }}>
           {/* Bottom-left dot pattern */}
@@ -1965,8 +1979,8 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0c0c0c",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 270,
-          padding: "26px 28px",
+          minHeight: isMobile ? 240 : 270,
+          padding: isMobile ? "22px 22px" : "26px 28px",
           justifyContent: "space-between",
         }}>
           {/* Subtle checkered/grid background — visible on left side */}
@@ -2038,8 +2052,8 @@ function ServicesSection() {
         <div style={{
           ...cardBaseStyle,
           background: "#0a0907",
-          minHeight: 230,
-          padding: "22px 22px",
+          minHeight: isMobile ? 210 : 230,
+          padding: isMobile ? "20px 20px" : "22px 22px",
           justifyContent: "space-between",
         }}>
           {/* Yellow/orange glow from bottom area */}
@@ -2077,8 +2091,8 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0a0a0a",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 230,
-          padding: "22px 22px",
+          minHeight: isMobile ? 210 : 230,
+          padding: isMobile ? "20px 20px" : "22px 22px",
           justifyContent: "space-between",
         }}>
           {/* Topo pattern overlay — slightly more subtle */}
@@ -2109,7 +2123,7 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0a0a0a",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 230,
+          minHeight: isMobile ? 210 : 230,
           padding: 0,
         }}>
           {/* Wave at top */}
@@ -2220,7 +2234,7 @@ function AnimatedHeadline() {
       animate="show"
       style={{
         margin: 0,
-        fontSize: "clamp(40px, 5.5vw, 72px)",
+        fontSize: "clamp(34px, 5.5vw, 72px)",
         lineHeight: 1.05,
       }}
     >
@@ -2506,8 +2520,8 @@ export default function App() {
         <Canvas
           shadows
           camera={{
-            position: isMobile ? [0, 0.1, 4.6] : [0.7, 0.35, 2.75],
-            fov: isMobile ? 42 : 38,
+            position: isMobile ? [0, 0.05, 3.9] : [0.7, 0.35, 2.75],
+            fov: isMobile ? 48 : 38,
           }}
           gl={canvasGl}
           dpr={[1, 2]}
@@ -2517,6 +2531,7 @@ export default function App() {
             loading={loading}
             spinRef={inputSpinRef}
             quizKey={quizKey}
+            isMobile={isMobile}
           />
         </Canvas>
 
@@ -2566,12 +2581,13 @@ export default function App() {
         {/* Bottom-left big headline + scroll hint */}
         <div style={{
           position: "absolute",
-          bottom: isMobile ? 28 : 56,
-          left: isMobile ? 16 : 32,
-          right: isMobile ? 16 : "auto",
+          bottom: isMobile ? 56 : 56,
+          left: isMobile ? 20 : 32,
+          right: isMobile ? 20 : "auto",
           zIndex: 10,
-          maxWidth: isMobile ? "calc(100% - 32px)" : "55%",
+          maxWidth: isMobile ? "calc(100% - 40px)" : "55%",
           pointerEvents: "none",
+          textAlign: isMobile ? "left" : "left",
         }}>
           <AnimatedHeadline />
 
@@ -2632,8 +2648,8 @@ export default function App() {
           <Canvas
             shadows
             camera={{
-              position: isMobile ? [0, 0.1, 5.4] : [0, 0.1, 4.0],
-              fov: isMobile ? 50 : 46,
+              position: isMobile ? [0, 0.05, 5.4] : [0, 0.1, 4.0],
+              fov: isMobile ? 56 : 46,
             }}
             gl={canvasGl}
             dpr={[1, 2]}
