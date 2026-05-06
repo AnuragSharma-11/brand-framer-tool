@@ -4,6 +4,20 @@ import { OrbitControls, Html, useGLTF, Center, Environment, ContactShadows, Roun
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { motion } from "framer-motion"
 
+/* ---------------- VIEWPORT — responsive breakpoint hook ---------------- */
+// Mobile breakpoint: < 768px (covers all phones)
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  )
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < breakpoint)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [breakpoint])
+  return isMobile
+}
+
 /* ---------------- AUDIO (Web Audio API — no files needed) ---------------- */
 let _audioCtx = null
 function getAudioCtx() {
@@ -312,7 +326,7 @@ const diagInputStyle = {
   transition: "border-color 0.15s",
 }
 
-function OptionRow({ label, selected, onClick }) {
+function OptionRow({ label, selected, onClick, multiSelect = false }) {
   const [hover, setHover] = useState(false)
 
   // Color resolution priority: selected > hover > default
@@ -343,14 +357,41 @@ function OptionRow({ label, selected, onClick }) {
         background: bgColor,
         fontWeight: selected ? 500 : 400,
         transition: "color 0.15s, background 0.15s, border-color 0.15s, transform 0.15s",
-        transform: hover && !selected ? "translateX(2px)" : "translateX(0)",
+        transform: hover && !selected && !multiSelect ? "translateX(2px)" : "translateX(0)",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {selected && <span style={{ width: 5, height: 5, borderRadius: "50%", background: ACCENT }} />}
+      <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {multiSelect ? (
+          <span style={{
+            width: 15,
+            height: 15,
+            borderRadius: 4,
+            border: `1.5px solid ${selected ? ACCENT : "rgba(255, 255, 255, 0.25)"}`,
+            background: selected ? ACCENT : "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.15s",
+            flexShrink: 0,
+          }}>
+            {selected && (
+              <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true">
+                <path
+                  d="M1 4.6 L3.6 7 L8 1.6"
+                  stroke={BG}
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </span>
+        ) : (
+          selected && <span style={{ width: 5, height: 5, borderRadius: "50%", background: ACCENT }} />
+        )}
         {label}
       </span>
-      <Chevron color={chevColor} />
+      {!multiSelect && <Chevron color={chevColor} />}
     </div>
   )
 }
@@ -365,7 +406,7 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
     url: "",   // Q3 (input)
     businessAge: "",   // Q4
     hurt: [],   // Q5 — multi-select array
-    need: "",   // Q6
+    need: [],   // Q6 — multi-select array
     recentChange: "",   // Q7 (input)
   })
 
@@ -405,12 +446,31 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
     })
   }
 
+  // Toggle a Q6 (need) option. Multi-select with same exclusivity pattern as Q5:
+  // "Not sure — tell me" selects all when picked; picking another option clears it.
+  const toggleNeed = (option) => {
+    setData((d) => {
+      const cur = Array.isArray(d.need) ? d.need : []
+      if (option === "Not sure — tell me") {
+        return { ...d, need: cur.includes(option) ? [] : [...NEED_OPTS] }
+      }
+      let next = cur.includes(option)
+        ? cur.filter((x) => x !== option)
+        : [...cur, option]
+      if (next.includes("Not sure — tell me") && next.length < NEED_OPTS.length) {
+        next = next.filter((x) => x !== "Not sure — tell me")
+      }
+      return { ...d, need: next }
+    })
+  }
+
   // Trigger AI generation in the parent (Scene), then advance to "transmitted" screen
   const submitAndAdvance = () => {
     const cleaned = {
       ...data,
-      // Backend expects a string — join multi-select array
+      // Backend expects strings — join multi-select arrays
       hurt: Array.isArray(data.hurt) ? data.hurt.join(", ") : data.hurt,
+      need: Array.isArray(data.need) ? data.need.join(", ") : data.need,
     }
     onGenerate?.(cleaned)
     setStep(8)
@@ -523,15 +583,35 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
                 label={o}
                 selected={(data.hurt || []).includes(o)}
                 onClick={() => toggleHurt(o)}
+                multiSelect
               />
             ))}
           </>
         )}
 
-        {/* Q6 — What do you need */}
-        {step === 6 && NEED_OPTS.map((o) => (
-          <OptionRow key={o} label={o} selected={data.need === o} onClick={() => handleSelect("need", o)} />
-        ))}
+        {/* Q6 — What do you need (MULTI-SELECT). NEXT button lives in the footer. */}
+        {step === 6 && (
+          <>
+            <div style={{
+              fontSize: 10,
+              color: TEXT_DIM,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: 2,
+            }}>
+              Select all that apply
+            </div>
+            {NEED_OPTS.map((o) => (
+              <OptionRow
+                key={o}
+                label={o}
+                selected={(data.need || []).includes(o)}
+                onClick={() => toggleNeed(o)}
+                multiSelect
+              />
+            ))}
+          </>
+        )}
 
         {/* Q7 — Recent change input */}
         {step === 7 && (
@@ -621,36 +701,40 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
           ))}
         </div>
 
-        {/* Right slot — only used by Q5 multi-select to advance */}
+        {/* Right slot — used by Q5 + Q6 multi-select to advance */}
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          {step === 5 && (
-            <button
-              onClick={() => {
-                if (!(data.hurt || []).length) return
-                playSelect()
-                next()
-              }}
-              disabled={!(data.hurt || []).length}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: (data.hurt || []).length ? ACCENT : TEXT_DIM,
-                cursor: (data.hurt || []).length ? "pointer" : "not-allowed",
-                padding: 0,
-                fontSize: 11,
-                fontWeight: 600,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                letterSpacing: "0.04em",
-                opacity: (data.hurt || []).length ? 1 : 0.5,
-                transition: "color 0.15s, opacity 0.15s",
-              }}
-            >
-              NEXT
-              <Chevron color={(data.hurt || []).length ? ACCENT : TEXT_DIM} />
-            </button>
-          )}
+          {(step === 5 || step === 6) && (() => {
+            const arr = step === 5 ? (data.hurt || []) : (data.need || [])
+            const hasSelection = arr.length > 0
+            return (
+              <button
+                onClick={() => {
+                  if (!hasSelection) return
+                  playSelect()
+                  next()
+                }}
+                disabled={!hasSelection}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: hasSelection ? ACCENT : TEXT_DIM,
+                  cursor: hasSelection ? "pointer" : "not-allowed",
+                  padding: 0,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  letterSpacing: "0.04em",
+                  opacity: hasSelection ? 1 : 0.5,
+                  transition: "color 0.15s, opacity 0.15s",
+                }}
+              >
+                NEXT
+                <Chevron color={hasSelection ? ACCENT : TEXT_DIM} />
+              </button>
+            )
+          })()}
         </div>
       </div>
     </div>
@@ -1458,11 +1542,15 @@ function CameraIntro({ from = [0, 0.4, 7.5], to = [0, 0.1, 4.0], duration = 1.8 
 }
 
 /* ---------------- OUTPUT SCENE — TabletDevice with ResultUI ---------------- */
-function OutputScene({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail }) {
+function OutputScene({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail, isMobile = false }) {
   return (
     <>
       {/* Camera intro — dollies from far → close on mount for cinematic reveal */}
-      <CameraIntro from={[0, 0.6, 7.5]} to={[0, 0.1, 4.0]} duration={1.8} />
+      <CameraIntro
+        from={isMobile ? [0, 0.4, 9.0] : [0, 0.6, 7.5]}
+        to={isMobile ? [0, 0.1, 5.4] : [0, 0.1, 4.0]}
+        duration={1.8}
+      />
 
       {/* Layered atmospheric lighting */}
       <ambientLight intensity={0.3} />
@@ -1533,25 +1621,26 @@ const PROJECTS = [
 
 /* ---------------- PROJECTS SECTION (Section 3) ---------------- */
 function ProjectsSection() {
+  const isMobile = useIsMobile()
   return (
     <div style={{
       width: "100%",
       height: "100%",
       maxWidth: 1100,
       margin: "0 auto",
-      padding: "60px 32px",
+      padding: isMobile ? "40px 18px" : "60px 32px",
       boxSizing: "border-box",
       display: "flex",
       flexDirection: "column",
       justifyContent: "center",
-      gap: 40,
+      gap: isMobile ? 28 : 40,
       position: "relative",
       zIndex: 3,
     }}>
       {/* Hero header */}
       <div style={{ textAlign: "center" }}>
         <div style={{
-          fontSize: 11,
+          fontSize: isMobile ? 10 : 11,
           color: "#b46cff",
           letterSpacing: "0.18em",
           textTransform: "uppercase",
@@ -1561,14 +1650,14 @@ function ProjectsSection() {
           ✦ While you read your report
         </div>
         <div style={{
-          fontSize: 36,
+          fontSize: isMobile ? 24 : 36,
           fontWeight: 700,
           color: "#ffffff",
           lineHeight: 1.15,
           letterSpacing: "-0.02em",
           marginBottom: 12,
         }}>
-          Here's what we've shipped<br />for founders like you.
+          Here's what we've shipped{!isMobile && <br />} for founders like you.
         </div>
         <div style={{
           fontSize: 14,
@@ -1702,12 +1791,12 @@ function ServiceTag({ children, light = false }) {
   return (
     <span style={{
       display: "inline-block",
-      padding: "7px 14px",
+      padding: "5px 11px",
       borderRadius: 999,
       background: light ? "rgba(255, 255, 255, 0.14)" : "rgba(255, 255, 255, 0.06)",
       border: `1px solid ${light ? "rgba(255, 255, 255, 0.18)" : "rgba(255, 255, 255, 0.08)"}`,
       color: light ? "rgba(255, 255, 255, 0.92)" : "rgba(255, 255, 255, 0.78)",
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: 500,
       letterSpacing: "0.06em",
       textTransform: "uppercase",
@@ -1721,6 +1810,7 @@ function ServiceTag({ children, light = false }) {
 }
 
 function ServicesSection() {
+  const isMobile = useIsMobile()
   // Reusable card visual base
   const cardBaseStyle = {
     position: "relative",
@@ -1732,7 +1822,7 @@ function ServicesSection() {
   }
   const titleLg = {
     margin: 0,
-    fontSize: "clamp(24px, 2.1vw, 32px)",
+    fontSize: "clamp(20px, 1.7vw, 26px)",
     fontWeight: 500,
     color: "#ffffff",
     fontFamily: "'Inter Tight', system-ui, sans-serif",
@@ -1741,13 +1831,13 @@ function ServicesSection() {
   }
   const titleMd = {
     ...titleLg,
-    fontSize: "clamp(20px, 1.7vw, 26px)",
+    fontSize: "clamp(17px, 1.35vw, 21px)",
   }
   const descStyle = {
     margin: 0,
-    color: "rgba(255, 255, 255, 0.82)",
-    fontSize: 13,
-    lineHeight: 1.55,
+    color: "rgba(255, 255, 255, 0.78)",
+    fontSize: 12,
+    lineHeight: 1.5,
     fontFamily: "'Inter Tight', system-ui, sans-serif",
     fontWeight: 400,
   }
@@ -1757,7 +1847,7 @@ function ServicesSection() {
       width: "100%",
       maxWidth: 1100,
       margin: "0 auto",
-      padding: "80px 32px 60px",
+      padding: isMobile ? "56px 18px 48px" : "80px 32px 60px",
       boxSizing: "border-box",
       position: "relative",
       zIndex: 3,
@@ -1809,17 +1899,17 @@ function ServicesSection() {
         transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
         style={{
           display: "grid",
-          gridTemplateColumns: "1.45fr 1fr",
-          gap: 16,
-          marginBottom: 16,
+          gridTemplateColumns: isMobile ? "1fr" : "1.45fr 1fr",
+          gap: isMobile ? 14 : 16,
+          marginBottom: isMobile ? 14 : 16,
         }}
       >
         {/* ━━━ BRAND INTELLIGENCE — large red card with 3D logo ━━━ */}
         <div style={{
           ...cardBaseStyle,
           background: "radial-gradient(ellipse 95% 110% at 80% 20%, #db302a 0%, #b22420 30%, #761816 60%, #480d0d 100%)",
-          minHeight: 320,
-          padding: "32px 36px",
+          minHeight: 270,
+          padding: "26px 32px",
           justifyContent: "space-between",
         }}>
           {/* Bottom-left dot pattern */}
@@ -1875,8 +1965,8 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0c0c0c",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 320,
-          padding: "32px 32px",
+          minHeight: 270,
+          padding: "26px 28px",
           justifyContent: "space-between",
         }}>
           {/* Subtle checkered/grid background — visible on left side */}
@@ -1940,16 +2030,16 @@ function ServicesSection() {
         transition={{ duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: 16,
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr",
+          gap: isMobile ? 14 : 16,
         }}
       >
         {/* ━━━ DIGITAL PRODUCT — orange/yellow glow ━━━ */}
         <div style={{
           ...cardBaseStyle,
           background: "#0a0907",
-          minHeight: 280,
-          padding: "28px 26px",
+          minHeight: 230,
+          padding: "22px 22px",
           justifyContent: "space-between",
         }}>
           {/* Yellow/orange glow from bottom area */}
@@ -1987,8 +2077,8 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0a0a0a",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 280,
-          padding: "28px 26px",
+          minHeight: 230,
+          padding: "22px 22px",
           justifyContent: "space-between",
         }}>
           {/* Topo pattern overlay — slightly more subtle */}
@@ -2019,13 +2109,13 @@ function ServicesSection() {
           ...cardBaseStyle,
           background: "#0a0a0a",
           border: "1px solid rgba(255, 255, 255, 0.05)",
-          minHeight: 280,
+          minHeight: 230,
           padding: 0,
         }}>
           {/* Wave at top */}
           <div style={{
             width: "100%",
-            height: 130,
+            height: 110,
             backgroundImage: "url(/services/service-wave.png)",
             backgroundSize: "cover",
             backgroundPosition: "center",
@@ -2043,13 +2133,13 @@ function ServicesSection() {
           {/* Lower content */}
           <div style={{
             flex: 1,
-            padding: "0 24px 22px",
+            padding: "0 20px 18px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            gap: 20,
+            gap: 14,
           }}>
-            <h3 style={{ ...titleMd, marginTop: 8 }}>All Services</h3>
+            <h3 style={{ ...titleMd, marginTop: 6 }}>All Services</h3>
             <a
               href={CALL_BOOKING_LINK}
               target="_blank"
@@ -2063,7 +2153,7 @@ function ServicesSection() {
                 gap: 12,
                 background: "#f4dbcd",
                 color: "#0e0e0e",
-                padding: "16px 24px",
+                padding: "14px 20px",
                 borderRadius: 999,
                 fontSize: 11,
                 fontWeight: 600,
@@ -2249,6 +2339,9 @@ function HeroParticles({ count = 36 }) {
 
 /* ---------------- APP — two stacked sections, reveals OUTPUT after submit ---------------- */
 export default function App() {
+  // Responsive breakpoint
+  const isMobile = useIsMobile()
+
   // Lifted report state
   const [report, setReport] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -2271,28 +2364,36 @@ export default function App() {
   // Increment to force a fresh QuizUI mount (clears internal step state)
   const [quizKey, setQuizKey] = useState(0)
 
-  // 🔒 Lock body scroll at the deepest revealed section. Re-locks on each new section reveal.
+  // 🔒 Body scroll behavior:
+  //   • Hero (no report yet)        → locked (user must complete quiz first)
+  //   • Report section onwards      → unlocked permanently, user can scroll freely
+  //
   // NOTE: explicit "auto" (not "") is required to override the CSS `body { overflow: hidden }`
   // rule that prevents the scrollbar-flash on initial load.
   useEffect(() => {
-    if (showProjects) {
-      // Once projects + services reveal, leave scroll permanently unlocked so user
-      // can naturally scroll down to the services section.
+    if (showResult) {
+      // Once the report section appears, unlock scroll permanently — user can now
+      // freely scroll between Section 2 (report), Section 3 (projects), and Section 4 (services).
       document.body.style.overflow = "auto"
       return
     }
-    if (showResult) {
-      // Unlock so the cinematic scroll can run
-      document.body.style.overflow = "auto"
-      // Re-lock once scroll animation finishes (900ms delay + 3000ms scroll + buffer)
-      const timer = setTimeout(() => {
-        document.body.style.overflow = "hidden"
-      }, 4100)
-      return () => clearTimeout(timer)
-    }
-    // Hero alone is 100vh — keep body locked so no phantom scrollbar appears on reload
+    // Hero alone (showResult=false) — keep scroll locked so quiz is the only path forward.
     document.body.style.overflow = "hidden"
-  }, [showResult, showProjects])
+
+    // ── OLD BEHAVIOR (commented out per user request — was re-locking after cinematic scroll
+    //    so user couldn't reach lower sections without submitting email) ──
+    // if (showProjects) {
+    //   document.body.style.overflow = "auto"
+    //   return
+    // }
+    // if (showResult) {
+    //   document.body.style.overflow = "auto"
+    //   const timer = setTimeout(() => {
+    //     document.body.style.overflow = "hidden"
+    //   }, 4100)
+    //   return () => clearTimeout(timer)
+    // }
+  }, [showResult])
 
   const handleGenerate = useCallback(async (answers) => {
     setLastAnswers(answers)
@@ -2401,8 +2502,16 @@ export default function App() {
 
       {/* SECTION 1: INPUT device (always visible at top) */}
       <section className="scene-section is-input">
-        <HeroParticles />
-        <Canvas shadows camera={{ position: [0.7, 0.35, 2.75], fov: 38 }} gl={canvasGl} dpr={[1, 2]}>
+        <HeroParticles count={isMobile ? 18 : 36} />
+        <Canvas
+          shadows
+          camera={{
+            position: isMobile ? [0, 0.1, 4.6] : [0.7, 0.35, 2.75],
+            fov: isMobile ? 42 : 38,
+          }}
+          gl={canvasGl}
+          dpr={[1, 2]}
+        >
           <InputScene
             onGenerate={handleGenerate}
             loading={loading}
@@ -2419,43 +2528,49 @@ export default function App() {
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.9, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           style={{
-          position: "absolute",
-          top: 24,
-          left: 32,
-          zIndex: 10,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "8px 16px 8px 12px",
-          background: "rgba(255, 255, 255, 0.06)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          borderRadius: 999,
-          pointerEvents: "none",
-        }}>
+            position: "absolute",
+            top: isMobile ? 14 : 24,
+            left: isMobile ? 14 : 32,
+            zIndex: 10,
+            display: "flex",
+            alignItems: "center",
+            gap: isMobile ? 6 : 10,
+            padding: isMobile ? "6px 12px 6px 8px" : "8px 16px 8px 12px",
+            background: "rgba(255, 255, 255, 0.06)",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderRadius: 999,
+            pointerEvents: "none",
+          }}
+        >
           <div style={{
-            width: 22, height: 22, borderRadius: "50%",
+            width: isMobile ? 18 : 22,
+            height: isMobile ? 18 : 22,
+            borderRadius: "50%",
             background: "linear-gradient(135deg, #b46cff 0%, #6e3fcc 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 11, fontWeight: 700, color: "#fff",
+            fontSize: isMobile ? 9 : 11, fontWeight: 700, color: "#fff",
             boxShadow: "0 0 12px rgba(180, 108, 255, 0.4)",
           }}>✦</div>
-          <span style={{ fontSize: 13, color: "#ffffff", fontWeight: 500, letterSpacing: "0.01em" }}>
+          <span style={{ fontSize: isMobile ? 11 : 13, color: "#ffffff", fontWeight: 500, letterSpacing: "0.01em" }}>
             BrandHero
           </span>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>
-            Strategy Diagnostic
-          </span>
+          {!isMobile && (
+            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>
+              Strategy Diagnostic
+            </span>
+          )}
         </motion.div>
 
         {/* Bottom-left big headline + scroll hint */}
         <div style={{
           position: "absolute",
-          bottom: 56,
-          left: 32,
+          bottom: isMobile ? 28 : 56,
+          left: isMobile ? 16 : 32,
+          right: isMobile ? 16 : "auto",
           zIndex: 10,
-          maxWidth: "55%",
+          maxWidth: isMobile ? "calc(100% - 32px)" : "55%",
           pointerEvents: "none",
         }}>
           <AnimatedHeadline />
@@ -2465,11 +2580,11 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              marginTop: 22,
+              marginTop: isMobile ? 16 : 22,
               display: "flex",
               alignItems: "center",
               gap: 10,
-              fontSize: 11,
+              fontSize: isMobile ? 10 : 11,
               color: "rgba(255, 255, 255, 0.5)",
               letterSpacing: "0.16em",
               textTransform: "uppercase",
@@ -2486,33 +2601,43 @@ export default function App() {
           </motion.div>
         </div>
 
-        {/* Bottom-right tagline */}
-        <div style={{
-          position: "absolute",
-          bottom: 56,
-          right: 32,
-          zIndex: 10,
-          maxWidth: 480,
-          pointerEvents: "none",
-          textAlign: "right",
-        }}>
-          <AnimatedTagline
-            text="Take the guesswork out of growing your brand. Identify what's blocking you, get a custom strategy, and move faster than ever."
-            delay={0.5}
-            style={{
-              fontSize: 14,
-              color: "rgba(255, 255, 255, 0.6)",
-              lineHeight: 1.55,
-              fontWeight: 400,
-            }}
-          />
-        </div>
+        {/* Bottom-right tagline — hidden on mobile (would clutter narrow viewport) */}
+        {!isMobile && (
+          <div style={{
+            position: "absolute",
+            bottom: 56,
+            right: 32,
+            zIndex: 10,
+            maxWidth: 480,
+            pointerEvents: "none",
+            textAlign: "right",
+          }}>
+            <AnimatedTagline
+              text="Take the guesswork out of growing your brand. Identify what's blocking you, get a custom strategy, and move faster than ever."
+              delay={0.5}
+              style={{
+                fontSize: 14,
+                color: "rgba(255, 255, 255, 0.6)",
+                lineHeight: 1.55,
+                fontWeight: 400,
+              }}
+            />
+          </div>
+        )}
       </section>
 
       {/* SECTION 2: OUTPUT device (mounts after first Generate Report click) */}
       {showResult && (
         <section className="scene-section is-output" ref={outputSectionRef}>
-          <Canvas shadows camera={{ position: [0, 0.1, 4.0], fov: 46 }} gl={canvasGl} dpr={[1, 2]}>
+          <Canvas
+            shadows
+            camera={{
+              position: isMobile ? [0, 0.1, 5.4] : [0, 0.1, 4.0],
+              fov: isMobile ? 50 : 46,
+            }}
+            gl={canvasGl}
+            dpr={[1, 2]}
+          >
             <OutputScene
               report={report}
               loading={loading}
@@ -2524,6 +2649,7 @@ export default function App() {
               sending={sending}
               sendError={sendError}
               onSendEmail={handleSendEmail}
+              isMobile={isMobile}
             />
           </Canvas>
 
@@ -2537,13 +2663,13 @@ export default function App() {
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
             style={{
               position: "absolute",
-              top: 24,
-              left: 32,
+              top: isMobile ? 14 : 24,
+              left: isMobile ? 14 : 32,
               zIndex: 20,
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
+              gap: isMobile ? 6 : 8,
+              padding: isMobile ? "8px 14px" : "10px 16px",
               background: "rgba(255, 255, 255, 0.04)",
               border: "1px solid rgba(255, 255, 255, 0.12)",
               backdropFilter: "blur(12px)",
@@ -2568,15 +2694,17 @@ export default function App() {
         </section>
       )}
 
-      {/* SECTION 3: PROJECTS showcase (mounts after email sent) */}
-      {showProjects && (
+      {/* SECTION 3: PROJECTS showcase — now mounts when report section appears,
+          so user can scroll to it without needing to submit email. Email still triggers
+          a cinematic scroll TO this section as a UX nicety. */}
+      {showResult && (
         <section className="scene-section is-projects" ref={projectsSectionRef}>
           <ProjectsSection />
         </section>
       )}
 
-      {/* SECTION 4: SERVICES (What We Do) — mounts together with projects */}
-      {showProjects && (
+      {/* SECTION 4: SERVICES (What We Do) — also reachable as soon as report section appears */}
+      {showResult && (
         <section className="services-wrap is-services">
           <ServicesSection />
         </section>

@@ -154,3 +154,29 @@ section.services-wrap.is-services {
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(180, 108, 255, 0.4); }
 * { scrollbar-width: thin; scrollbar-color: rgba(180, 108, 255, 0.2) transparent; }
+
+/* ─────────────────────────────────────────────────────────
+   MOBILE / RESPONSIVE OVERRIDES (< 768px)
+   ───────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Hide thin scrollbar on mobile — touch scroll preferred */
+  ::-webkit-scrollbar { width: 0; }
+
+  /* Soften ambient haze on mobile (less visual noise on small screens) */
+  section.scene-section::before {
+    background-image:
+      radial-gradient(circle at 30% 30%, rgba(180, 108, 255, 0.04) 0%, transparent 40%),
+      radial-gradient(circle at 70% 70%, rgba(180, 108, 255, 0.03) 0%, transparent 40%);
+  }
+
+  /* Tighter section reveal on mobile (smaller translateY) */
+  @keyframes section-reveal {
+    0%   { opacity: 0; transform: translateY(28px) scale(0.96); filter: blur(10px); }
+    60%  { opacity: 0.7; }
+    100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
+  }
+}
+
+/* Remove the always-on hero particles count on small screens
+   (HeroParticles uses 36 by default — visually fine but burns paint cycles).
+   Keep them but the section::before haze is already softened above. */
