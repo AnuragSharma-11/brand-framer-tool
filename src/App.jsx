@@ -2359,7 +2359,7 @@ export default function App() {
   // Spin trigger for INPUT device
   const inputSpinRef = useRef(null)
   const outputSectionRef = useRef(null)
-  const projectsSectionRef = useRef(null)
+  const servicesSectionRef = useRef(null)
 
   // Increment to force a fresh QuizUI mount (clears internal step state)
   const [quizKey, setQuizKey] = useState(0)
@@ -2476,9 +2476,9 @@ export default function App() {
       }
       setSent(true)
 
-      // 🎬 Reveal Section 3 (Projects) and cinematic-scroll to it
-      setShowProjects(true)
-      smoothScrollToElement(() => projectsSectionRef.current, {
+      // 🎬 Cinematic-scroll to Section 3 (Services) on email submit
+      setShowProjects(true)   // legacy flag — kept for any downstream consumers
+      smoothScrollToElement(() => servicesSectionRef.current, {
         delay: 900,
         duration: 3000,
       })
@@ -2694,18 +2694,11 @@ export default function App() {
         </section>
       )}
 
-      {/* SECTION 3: PROJECTS showcase — now mounts when report section appears,
-          so user can scroll to it without needing to submit email. Email still triggers
-          a cinematic scroll TO this section as a UX nicety. */}
+      {/* SECTION 3: SERVICES (What We Do) — replaces the previous Projects section.
+          Mounts as soon as the report appears so user can scroll to it freely.
+          Email submission triggers a cinematic scroll TO this section. */}
       {showResult && (
-        <section className="scene-section is-projects" ref={projectsSectionRef}>
-          <ProjectsSection />
-        </section>
-      )}
-
-      {/* SECTION 4: SERVICES (What We Do) — also reachable as soon as report section appears */}
-      {showResult && (
-        <section className="services-wrap is-services">
+        <section className="services-wrap is-services" ref={servicesSectionRef}>
           <ServicesSection />
         </section>
       )}
