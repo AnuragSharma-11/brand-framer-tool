@@ -11,7 +11,7 @@ function getResend() {
 }
 
 // Brand palette for the email body
-const ACCENT = "#b46cff"
+const ACCENT = "#e63d2b"
 const BG = "#fafaf7"
 const CARD_BG = "#ffffff"
 const TEXT = "#1a1a1a"
@@ -132,7 +132,7 @@ function buildEmailHTML(report, name) {
           <!-- Hero header — branded purple band -->
           <tr>
             <td style="padding:0;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#1a0e2a 0%,#2a1a3e 60%,#3a2854 100%);">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#1a0808 0%,#3a1a1a 60%,#5a2820 100%);">
                 <tr>
                   <td style="padding:36px 32px 32px;">
                     <div style="font-size:10px;color:rgba(255,255,255,0.55);letter-spacing:0.18em;text-transform:uppercase;margin-bottom:8px;font-weight:600;">Brand Framer · Diagnostic Report</div>
@@ -206,7 +206,7 @@ function buildEmailHTML(report, name) {
           <!-- Recommended service hero -->
           <tr>
             <td style="padding:20px 32px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#f0e6ff 0%,#f7f0ff 100%);border:1px solid rgba(180,108,255,0.3);border-radius:12px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#fff0ec 0%,#fff7f4 100%);border:1px solid rgba(230,61,43,0.3);border-radius:12px;">
                 <tr>
                   <td style="padding:18px 22px;">
                     <div style="font-size:11px;color:${ACCENT};letter-spacing:0.1em;text-transform:uppercase;font-weight:700;margin-bottom:6px;">Recommended for you</div>
@@ -231,7 +231,7 @@ function buildEmailHTML(report, name) {
           <!-- 📞 CONTACT CTA section — book a call (primary) + email + phone -->
           <tr>
             <td style="padding:32px 32px 8px;">
-              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#1a0e2a 0%,#2a1a3e 100%);border-radius:14px;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background:linear-gradient(135deg,#1a0808 0%,#3a1a1a 100%);border-radius:14px;">
                 <tr>
                   <td style="padding:28px 28px 22px;text-align:center;">
                     <div style="font-size:11px;color:rgba(255,255,255,0.55);letter-spacing:0.18em;text-transform:uppercase;font-weight:600;margin-bottom:8px;">Ready to act on this?</div>
@@ -239,7 +239,7 @@ function buildEmailHTML(report, name) {
                     <div style="font-size:13px;color:rgba(255,255,255,0.7);line-height:1.55;margin-bottom:18px;max-width:420px;margin-left:auto;margin-right:auto;">15-minute call. No commitment. We'll go deeper on your specific situation.</div>
 
                     <!-- Primary CTA — Book a Call -->
-                    <a href="${CONTACT.callLink}" target="_blank" style="display:inline-block;background:${ACCENT};color:#1a0e2a;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;box-shadow:0 4px 14px rgba(180,108,255,0.4);">
+                    <a href="${CONTACT.callLink}" target="_blank" style="display:inline-block;background:${ACCENT};color:#1a0808;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.02em;box-shadow:0 4px 14px rgba(230,61,43,0.4);">
                       Book a 15-min call →
                     </a>
 

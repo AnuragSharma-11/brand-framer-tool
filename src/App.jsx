@@ -2,7 +2,7 @@ import * as THREE from "three"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, Html, useGLTF, Center, Environment, ContactShadows, RoundedBox, Text } from "@react-three/drei"
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 
 /* ---------------- VIEWPORT — responsive breakpoint hook ---------------- */
 // Mobile breakpoint: < 768px (covers all phones)
@@ -162,9 +162,9 @@ function MusicToggle() {
           width: 40,
           height: 40,
           borderRadius: "50%",
-          border: `1px solid ${playing ? "rgba(180, 108, 255, 0.6)" : "rgba(255, 255, 255, 0.15)"}`,
+          border: `1px solid ${playing ? "rgba(230, 61, 43, 0.6)" : "rgba(255, 255, 255, 0.15)"}`,
           background: playing
-            ? "rgba(180, 108, 255, 0.18)"
+            ? "rgba(230, 61, 43, 0.18)"
             : "rgba(0, 0, 0, 0.35)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
@@ -174,9 +174,9 @@ function MusicToggle() {
           justifyContent: "center",
           transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
           boxShadow: playing
-            ? "0 0 18px rgba(180, 108, 255, 0.35)"
+            ? "0 0 18px rgba(230, 61, 43, 0.35)"
             : "0 1px 3px rgba(0, 0, 0, 0.3)",
-          color: playing ? "#b46cff" : "rgba(255, 255, 255, 0.55)",
+          color: playing ? "#e63d2b" : "rgba(255, 255, 255, 0.55)",
           padding: 0,
         }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08)" }}
@@ -201,7 +201,7 @@ function MusicToggle() {
 }
 
 /* ---------------- QUIZ UI ---------------- */
-const ACCENT = "#b46cff"
+const ACCENT = "#e63d2b"
 const BG = "#0d0d0d"
 const TEXT_PRIMARY = "#ffffff"
 const TEXT_MUTED = "#888888"
@@ -332,10 +332,10 @@ function OptionRow({ label, selected, onClick, multiSelect = false }) {
   // Color resolution priority: selected > hover > default
   const textColor = selected ? ACCENT : hover ? "#cccccc" : TEXT_MUTED
   const bgColor = selected
-    ? hover ? "rgba(180, 108, 255, 0.10)" : "rgba(180, 108, 255, 0.05)"
+    ? hover ? "rgba(230, 61, 43, 0.10)" : "rgba(230, 61, 43, 0.05)"
     : hover ? "rgba(255, 255, 255, 0.04)" : "transparent"
   const borderColor = selected
-    ? "rgba(180, 108, 255, 0.5)"
+    ? "rgba(230, 61, 43, 0.5)"
     : hover ? "rgba(255, 255, 255, 0.08)" : "transparent"
   const chevColor = selected ? ACCENT : hover ? "#aaaaaa" : TEXT_DIM
 
@@ -398,8 +398,17 @@ function OptionRow({ label, selected, onClick, multiSelect = false }) {
 
 const TOTAL_STEPS = 8   // 7 questions + 1 result
 
-function QuizUI({ onAdvance, onGenerate, loading = false }) {
+function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
   const [step, setStep] = useState(1)
+  const startedRef = useRef(false)
+
+  // Fire onStart exactly once when user moves past Q1 (i.e. they've started answering)
+  useEffect(() => {
+    if (step > 1 && !startedRef.current) {
+      startedRef.current = true
+      onStart?.()
+    }
+  }, [step, onStart])
   const [data, setData] = useState({
     liveProduct: "",   // Q1: Yes / No
     industry: "",   // Q2
@@ -516,7 +525,7 @@ function QuizUI({ onAdvance, onGenerate, loading = false }) {
       cursor: "default",
       userSelect: "none",
       WebkitUserSelect: "none",
-      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(180, 108, 255, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(180, 108, 255, 0.3) inset`,
+      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(230, 61, 43, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(230, 61, 43, 0.3) inset`,
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -746,22 +755,22 @@ const QUIZ_UI_W = 340
 const QUIZ_UI_H = 420
 const SCREEN_FILL = 50   // 👈 isko badhao: 1 = exact fit, 2 = 2x bada, 5 = 5x, etc.
 
-/* 👇 MODEL APPEARANCE — Titanium Gray (iPhone Pro vibes) */
+/* 👇 MODEL APPEARANCE — Premium warm-black titanium (molten/golden-hour vibes) */
 const MODEL_LOOK = {
-  color: "#2a2c30",   // cool dark gray with slight blue undertone
-  metalness: 0.92,        // bumped — sharper metallic sheen
-  roughness: 0.22,        // smoother → cleaner highlights & reflections
-  envIntensity: 2.1,         // stronger env reflections that shimmer on rotate
-  envPreset: "studio",    // clean white-light softbox reflections
+  color: "#1c1717",   // warmer near-black with deeper red undertone
+  metalness: 0.95,        // sharper metallic sheen
+  roughness: 0.18,        // smoother → crisp mirror highlights
+  envIntensity: 2.6,         // stronger env reflections that catch the eye
+  envPreset: "studio",    // clean studio reflections
 }
 
 /* 👇 SCREEN GLOW — makes the display feel lit/active */
 const SCREEN_GLOW = {
-  color: "#b46cff",   // glow tint (matches UI accent purple)
-  intensity: 1.2,         // point-light strength near the screen
-  emissive: 0.6,         // 0–1, how strongly the screen mesh self-glows
-  haloBlur: 60,          // CSS halo blur radius (px)
-  haloAlpha: 0.55,        // CSS halo strength 0–1
+  color: "#ff3525",   // deep saturated vermillion — molten lava feel
+  intensity: 1.5,         // brighter point-light near the screen
+  emissive: 0.85,         // stronger self-glow on the screen mesh
+  haloBlur: 75,          // larger atmospheric halo
+  haloAlpha: 0.7,        // more visible glow
 }
 
 /* ---------------- RESULT UI (rendered on the SECOND device) ---------------- */
@@ -820,7 +829,7 @@ function PriorityRow({ num, title, description, severity }) {
         <span style={{ fontSize: 10, color: TEXT_PRIMARY, fontWeight: 600, flex: 1 }}>{title}</span>
         <span style={{ fontSize: 9, color: TEXT_DIM, flexShrink: 0 }}>{severity}/10</span>
       </div>
-      <div style={{ height: 3, background: "rgba(180, 108, 255, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 28 }}>
+      <div style={{ height: 3, background: "rgba(230, 61, 43, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 28 }}>
         <div style={{ height: "100%", width: `${fill}%`, background: ACCENT, transition: "width 0.4s ease-out" }} />
       </div>
       {description && (
@@ -860,7 +869,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
       userSelect: "none",
       WebkitUserSelect: "none",
       overflow: "hidden",
-      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(180, 108, 255, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(180, 108, 255, 0.3) inset`,
+      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(230, 61, 43, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(230, 61, 43, 0.3) inset`,
     }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -872,9 +881,9 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
         /* Custom scrollbar — subtle, premium */
         .result-scroll::-webkit-scrollbar { width: 4px; }
         .result-scroll::-webkit-scrollbar-track { background: transparent; }
-        .result-scroll::-webkit-scrollbar-thumb { background: rgba(180, 108, 255, 0.3); border-radius: 2px; }
-        .result-scroll::-webkit-scrollbar-thumb:hover { background: rgba(180, 108, 255, 0.5); }
-        .result-scroll { scrollbar-width: thin; scrollbar-color: rgba(180, 108, 255, 0.3) transparent; }
+        .result-scroll::-webkit-scrollbar-thumb { background: rgba(230, 61, 43, 0.3); border-radius: 2px; }
+        .result-scroll::-webkit-scrollbar-thumb:hover { background: rgba(230, 61, 43, 0.5); }
+        .result-scroll { scrollbar-width: thin; scrollbar-color: rgba(230, 61, 43, 0.3) transparent; }
       `}</style>
 
       {/* Header — minimal "Book a call" pill on top-right when report is ready */}
@@ -904,18 +913,18 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
                 fontWeight: 700,
                 textDecoration: "none",
                 padding: "3px 8px",
-                border: `1px solid rgba(180, 108, 255, 0.4)`,
+                border: `1px solid rgba(230, 61, 43, 0.4)`,
                 borderRadius: 999,
                 transition: "all 0.15s",
-                background: "rgba(180, 108, 255, 0.06)",
+                background: "rgba(230, 61, 43, 0.06)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(180, 108, 255, 0.18)"
-                e.currentTarget.style.borderColor = "rgba(180, 108, 255, 0.7)"
+                e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"
+                e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.7)"
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(180, 108, 255, 0.06)"
-                e.currentTarget.style.borderColor = "rgba(180, 108, 255, 0.4)"
+                e.currentTarget.style.background = "rgba(230, 61, 43, 0.06)"
+                e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.4)"
               }}
             >
               Book Call ↗
@@ -983,8 +992,8 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
 
           {/* BOTTOM CTA card — wraps tagline + form together, pinned to bottom via spacer above */}
           <div style={{
-            background: "rgba(180, 108, 255, 0.05)",
-            border: "1px solid rgba(180, 108, 255, 0.18)",
+            background: "rgba(230, 61, 43, 0.05)",
+            border: "1px solid rgba(230, 61, 43, 0.18)",
             borderRadius: 10,
             padding: "12px 14px",
             display: "flex",
@@ -1016,7 +1025,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
                     style={{
                       flex: 1,
                       background: "rgba(0, 0, 0, 0.4)",
-                      border: `1px solid rgba(180, 108, 255, 0.25)`,
+                      border: `1px solid rgba(230, 61, 43, 0.25)`,
                       borderRadius: 6,
                       padding: "9px 12px",
                       color: TEXT_PRIMARY,
@@ -1073,7 +1082,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
 function TabletDevice({
   position = [0, 0, 0],
   children,
-  glowColor = "#b46cff",
+  glowColor = "#e63d2b",
   glowIntensity = 1.4,
   isMobile = false,
 }) {
@@ -1335,6 +1344,8 @@ function Device({
     const tNow = state.clock.elapsedTime
     // Gentle idle float — subtle vertical bob + tiny tilt drift
     groupRef.current.position.y = position[1] + Math.sin(tNow * 0.6) * 0.045
+    // Smoothly lerp X toward target so layout transitions feel cinematic, not snappy
+    groupRef.current.position.x += (position[0] - groupRef.current.position.x) * 0.04
     if (a.active) {
       const t = tNow - a.startTime
       const p = Math.min(t / SPIN_DURATION, 1)
@@ -1462,8 +1473,28 @@ function FallbackBox() {
   )
 }
 
+/* ⚡ Lightning pulse — slow breathing brightness with occasional sharp flashes */
+function LightningPulseLight({ position = [0, 1.5, 1.5], color = "#ff6645" }) {
+  const ref = useRef()
+  const flashRef = useRef({ until: 0 })
+  useFrame((state) => {
+    if (!ref.current) return
+    const t = state.clock.elapsedTime
+    // Slow breathing pulse 0.6 ↔ 1.6
+    const pulse = 1.1 + Math.sin(t * 0.7) * 0.5
+    // Occasional bright flash (~every 6-10s)
+    if (t > flashRef.current.until && Math.random() < 0.001) {
+      flashRef.current.until = t + 0.18
+    }
+    const flashing = t < flashRef.current.until
+    const flash = flashing ? 4.5 : 0
+    ref.current.intensity = pulse + flash
+  })
+  return <pointLight ref={ref} position={position} color={color} distance={7} decay={2} />
+}
+
 /* Orbiting accent light — slow circular motion creates moving highlights on the device */
-function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color = "#b46cff", intensity = 2.4 }) {
+function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color = "#ff6645", intensity = 3.0 }) {
   const ref = useRef()
   useFrame((state) => {
     if (!ref.current) return
@@ -1476,40 +1507,50 @@ function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color =
 }
 
 /* ---------------- INPUT SCENE — single GLB device with QuizUI ---------------- */
-function InputScene({ onGenerate, loading, spinRef, quizKey = 0, isMobile = false }) {
+function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobile = false }) {
   // On mobile, push the device up so hero text below has room to breathe (Contra-style layout)
   const deviceY = isMobile ? 0.55 : 0
+  const deviceX = 0
   return (
     <>
       <ambientLight intensity={0.35} />
       <directionalLight position={[5, 6, 5]} intensity={1.1} castShadow />
       <directionalLight position={[-5, 4, 4]} intensity={0.5} />
-      <directionalLight position={[0, 3, -5]} intensity={1.5} color="#a78bff" />
+      <directionalLight position={[0, 3, -5]} intensity={1.5} color="#ff8576" />
 
-      {/* Slow-moving purple accent — catches the device edges as it orbits */}
+      {/* Slow-moving accent — catches the device edges as it orbits */}
       <OrbitingAccentLight />
       {/* Rim light from behind for edge separation */}
-      <pointLight position={[0, 0.4, -3]} color="#d9b8ff" intensity={1.6} distance={6} decay={2} />
+      <pointLight position={[deviceX, 0.4, -3]} color="#ffc7b0" intensity={1.6} distance={6} decay={2} />
+
+      {/* ⚡ Lightning pulse — slow breathing red light that throws cinematic accents on the device */}
+      <LightningPulseLight position={[deviceX - 1.2, 1.6, 1.5]} color="#ff5040" />
+
+      {/* Strong key light from upper-left for premium depth — angled to catch top edge */}
+      <pointLight position={[deviceX - 2.5, 2.5, 2]} color="#ff8576" intensity={1.4} distance={6} decay={2} />
+      {/* Cool counter-fill from lower right — adds dimension */}
+      <pointLight position={[deviceX + 1.8, -1.2, 1.2]} color="#ffd0a8" intensity={0.7} distance={5} decay={2.5} />
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
       <Suspense fallback={<FallbackBox />}>
         <Device
-          position={[0, deviceY, 0]}
-          glowColor="#b46cff"
+          position={[deviceX, deviceY, 0]}
+          glowColor="#e63d2b"
           spinRef={spinRef}
         >
           <QuizUI
             key={quizKey}
             onAdvance={() => spinRef?.current?.(1)}
             onGenerate={onGenerate}
+            onStart={onStart}
             loading={loading}
           />
         </Device>
       </Suspense>
 
       <ContactShadows
-        position={[0, -1.4 + deviceY, 0]}
+        position={[deviceX, -1.4 + deviceY, 0]}
         opacity={0.55}
         scale={8}
         blur={2.4}
@@ -1527,7 +1568,7 @@ function InputScene({ onGenerate, loading, spinRef, quizKey = 0, isMobile = fals
         rotateSpeed={0.7}
         minPolarAngle={Math.PI / 3.5}
         maxPolarAngle={Math.PI / 1.8}
-        target={[0, deviceY, 0]}
+        target={[deviceX, deviceY, 0]}
       />
     </>
   )
@@ -1570,13 +1611,13 @@ function OutputScene({ report, loading, error, onRetry, contact, setContact, sen
       <directionalLight position={[5, 6, 5]} intensity={1.2} castShadow />
       <directionalLight position={[-5, 4, 4]} intensity={0.55} />
       {/* Top fill — soft purple wash */}
-      <directionalLight position={[0, 8, 2]} intensity={0.4} color="#c89cff" />
+      <directionalLight position={[0, 8, 2]} intensity={0.4} color="#ffaa9b" />
       {/* Rim/back light — purple to match primary theme */}
-      <directionalLight position={[0, 3, -5]} intensity={1.5} color="#a78bff" />
+      <directionalLight position={[0, 3, -5]} intensity={1.5} color="#ff8576" />
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
-      <TabletDevice position={[0, 0, 0]} glowColor="#b46cff" isMobile={isMobile}>
+      <TabletDevice position={[0, 0, 0]} glowColor="#e63d2b" isMobile={isMobile}>
         <ResultUI
           report={report}
           loading={loading}
@@ -1615,7 +1656,7 @@ const PROJECTS = [
     category: "Brand Positioning",
     description: "Repositioned a 4-yr healthcare SaaS from 'compliance tool' to 'clinical workflow OS' — won 3 enterprise deals in Q1.",
     tag: "Healthcare",
-    color: "#b46cff",
+    color: "#e63d2b",
   },
   {
     title: "Cinder & Co.",
@@ -1655,7 +1696,7 @@ function ProjectsSection() {
       <div style={{ textAlign: "center" }}>
         <div style={{
           fontSize: isMobile ? 10 : 11,
-          color: "#b46cff",
+          color: "#e63d2b",
           letterSpacing: "0.18em",
           textTransform: "uppercase",
           fontWeight: 700,
@@ -1702,7 +1743,7 @@ function ProjectsSection() {
           href={CALL_BOOKING_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "#b46cff", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid rgba(180,108,255,0.4)" }}
+          style={{ color: "#e63d2b", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid rgba(230,61,43,0.4)" }}
         >
           Book a call →
         </a>
@@ -1719,14 +1760,14 @@ function ProjectCard({ project, index }) {
       onMouseLeave={() => setHover(false)}
       style={{
         position: "relative",
-        background: "linear-gradient(180deg, rgba(180,108,255,0.06) 0%, rgba(0,0,0,0.4) 100%)",
-        border: `1px solid ${hover ? "rgba(180,108,255,0.4)" : "rgba(255,255,255,0.08)"}`,
+        background: "linear-gradient(180deg, rgba(230,61,43,0.06) 0%, rgba(0,0,0,0.4) 100%)",
+        border: `1px solid ${hover ? "rgba(230,61,43,0.4)" : "rgba(255,255,255,0.08)"}`,
         borderRadius: 14,
         padding: "20px 22px",
         cursor: "pointer",
         transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), border-color 0.3s, box-shadow 0.3s",
         transform: hover ? "translateY(-4px)" : "translateY(0)",
-        boxShadow: hover ? "0 16px 40px rgba(180, 108, 255, 0.15)" : "0 2px 8px rgba(0,0,0,0.3)",
+        boxShadow: hover ? "0 16px 40px rgba(230, 61, 43, 0.15)" : "0 2px 8px rgba(0,0,0,0.3)",
         animation: `result-block-in 0.7s cubic-bezier(0.22,1,0.36,1) ${index * 0.12}s both`,
       }}
     >
@@ -1875,7 +1916,7 @@ function ServicesSection() {
         style={{ textAlign: "center", marginBottom: isMobile ? 36 : 56 }}
       >
         <div style={{
-          color: "#e63d2b",
+          color: ACCENT,
           fontSize: isMobile ? 10 : 11,
           letterSpacing: "0.28em",
           textTransform: "uppercase",
@@ -2194,6 +2235,147 @@ function ServicesSection() {
   )
 }
 
+/* ---------------- REPORT SENT POPUP — full-screen overlay with success message ---------------- */
+function ReportSentPopup({ visible }) {
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0, 0, 0, 0.78)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            padding: 24,
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.85, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 10 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              background: "linear-gradient(135deg, rgba(20, 14, 14, 0.98) 0%, rgba(28, 20, 20, 0.95) 100%)",
+              border: "1px solid rgba(230, 61, 43, 0.35)",
+              borderRadius: 28,
+              padding: "52px 48px",
+              textAlign: "center",
+              maxWidth: 480,
+              width: "100%",
+              boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(230, 61, 43, 0.18)",
+              fontFamily: "'Inter Tight', system-ui, sans-serif",
+            }}
+          >
+            {/* Animated checkmark circle */}
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ duration: 0.7, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                width: 84,
+                height: 84,
+                borderRadius: "50%",
+                margin: "0 auto 28px",
+                background: "linear-gradient(135deg, #ff5a4a 0%, #e63d2b 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 0 50px rgba(230, 61, 43, 0.5), 0 8px 24px rgba(230, 61, 43, 0.3)",
+              }}
+            >
+              <motion.svg
+                width="42"
+                height="42"
+                viewBox="0 0 42 42"
+                fill="none"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.5, delay: 0.5, ease: "easeOut" }}
+              >
+                <motion.path
+                  d="M11 21 L18 28 L31 14"
+                  stroke="#ffffff"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  fill="none"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 0.5, delay: 0.5, ease: "easeOut" }}
+                />
+              </motion.svg>
+            </motion.div>
+
+            {/* Eyebrow label */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.7 }}
+              style={{
+                fontSize: 11,
+                color: "#e63d2b",
+                letterSpacing: "0.28em",
+                textTransform: "uppercase",
+                fontWeight: 600,
+                marginBottom: 14,
+              }}
+            >
+              ✦ Transmission Complete
+            </motion.div>
+
+            {/* Title */}
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                margin: 0,
+                fontSize: "clamp(26px, 3vw, 36px)",
+                fontWeight: 500,
+                color: "#ffffff",
+                letterSpacing: "-0.02em",
+                lineHeight: 1.1,
+                marginBottom: 14,
+              }}
+            >
+              Report sent to{" "}
+              <em style={{ fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic", color: "#ff7a6a" }}>
+                your inbox
+              </em>
+            </motion.h2>
+
+            {/* Body */}
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.95, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                margin: 0,
+                fontSize: 14,
+                color: "rgba(255, 255, 255, 0.65)",
+                lineHeight: 1.6,
+                maxWidth: 360,
+                marginInline: "auto",
+              }}
+            >
+              Check your email for the full strategy report — diagnosis, top priorities, recommended service, and a 30-day action plan.
+            </motion.p>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  )
+}
+
 /* ---------------- SUCCESS STORIES SECTION — works portfolio grid (Section 4) ---------------- */
 const STORIES = [
   {
@@ -2328,7 +2510,7 @@ function SuccessStoriesSection() {
         }}
       >
         <div style={{
-          color: "#e63d2b",
+          color: ACCENT,
           fontSize: isMobile ? 10 : 11,
           letterSpacing: "0.28em",
           textTransform: "uppercase",
@@ -2441,7 +2623,7 @@ function AnimatedHeadline() {
     },
     {
       text: "decoded.",
-      color: "#b46cff",
+      color: "#e63d2b",
       fontFamily: "'Fraunces', Georgia, serif",
       fontStyle: "italic",
       fontWeight: 300,
@@ -2573,8 +2755,8 @@ function HeroParticles({ count = 36 }) {
             width: p.size,
             height: p.size,
             borderRadius: "50%",
-            background: "#b46cff",
-            boxShadow: `0 0 ${p.size * 3}px rgba(180, 108, 255, 0.6)`,
+            background: "#e63d2b",
+            boxShadow: `0 0 ${p.size * 3}px rgba(230, 61, 43, 0.6)`,
             opacity: p.opacity,
             animation: `particle-float ${p.duration}s ease-in-out ${p.delay}s infinite`,
             "--drift": `${p.drift}px`,
@@ -2603,6 +2785,7 @@ export default function App() {
   const [sent, setSent] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false)
 
   // Spin trigger for INPUT device
   const inputSpinRef = useRef(null)
@@ -2612,36 +2795,26 @@ export default function App() {
   // Increment to force a fresh QuizUI mount (clears internal step state)
   const [quizKey, setQuizKey] = useState(0)
 
+  // Tracks whether the user has actively started answering — used to lock body scroll
+  // until they submit (or reset). Initial page load = unlocked, all sections scrollable.
+  const [quizStarted, setQuizStarted] = useState(false)
+  const handleQuizStart = useCallback(() => setQuizStarted(true), [])
+
   // 🔒 Body scroll behavior:
-  //   • Hero (no report yet)        → locked (user must complete quiz first)
-  //   • Report section onwards      → unlocked permanently, user can scroll freely
+  //   • Initial load                    → UNLOCKED (user can browse all sections freely)
+  //   • User starts answering quiz      → LOCKED (must submit to unlock again)
+  //   • User submits (showResult=true)  → UNLOCKED again
   //
   // NOTE: explicit "auto" (not "") is required to override the CSS `body { overflow: hidden }`
   // rule that prevents the scrollbar-flash on initial load.
   useEffect(() => {
-    if (showResult) {
-      // Once the report section appears, unlock scroll permanently — user can now
-      // freely scroll between Section 2 (report), Section 3 (projects), and Section 4 (services).
+    if (quizStarted && !showResult) {
+      // User mid-quiz — force them to finish (or reset) before browsing
+      document.body.style.overflow = "hidden"
+    } else {
       document.body.style.overflow = "auto"
-      return
     }
-    // Hero alone (showResult=false) — keep scroll locked so quiz is the only path forward.
-    document.body.style.overflow = "hidden"
-
-    // ── OLD BEHAVIOR (commented out per user request — was re-locking after cinematic scroll
-    //    so user couldn't reach lower sections without submitting email) ──
-    // if (showProjects) {
-    //   document.body.style.overflow = "auto"
-    //   return
-    // }
-    // if (showResult) {
-    //   document.body.style.overflow = "auto"
-    //   const timer = setTimeout(() => {
-    //     document.body.style.overflow = "hidden"
-    //   }, 4100)
-    //   return () => clearTimeout(timer)
-    // }
-  }, [showResult])
+  }, [quizStarted, showResult])
 
   const handleGenerate = useCallback(async (answers) => {
     setLastAnswers(answers)
@@ -2697,6 +2870,7 @@ export default function App() {
       setSent(false)
       setSending(false)
       setSendError(null)
+      setQuizStarted(false)      // clear quiz-in-progress flag → unlocks scroll
       setQuizKey((k) => k + 1)   // remount QuizUI → resets to step 1
     }, 1900)
   }, [])
@@ -2724,12 +2898,23 @@ export default function App() {
       }
       setSent(true)
 
-      // 🎬 Cinematic-scroll to Section 3 (Services) on email submit
-      setShowProjects(true)   // legacy flag — kept for any downstream consumers
-      smoothScrollToElement(() => servicesSectionRef.current, {
-        delay: 900,
-        duration: 3000,
-      })
+      // 🎉 Success popup — show, then hide report section after popup auto-dismisses
+      setShowSuccessPopup(true)
+      setTimeout(() => {
+        setShowSuccessPopup(false)
+        // Wait for popup fade-out before hiding report section + resetting state
+        setTimeout(() => {
+          setShowResult(false)
+          setReport(null)
+          setSent(false)
+          setContact({ name: "", email: "" })
+          setSendError(null)
+          setQuizStarted(false)         // unlocks scroll, hero is fresh
+          setQuizKey((k) => k + 1)      // remount QuizUI back to step 1
+          // Smooth-scroll back up to hero so user lands cleanly
+          smoothScrollToElement(() => document.body, { delay: 0, duration: 1500 })
+        }, 600)
+      }, 3500)
     } catch (err) {
       setSendError(err.message || "Failed to send")
     } finally {
@@ -2745,29 +2930,48 @@ export default function App() {
 
   return (
     <>
+      {/* Success popup — overlays everything when report is sent */}
+      <ReportSentPopup visible={showSuccessPopup} />
+
       {/* Floating music toggle — top-right corner, persists across all sections */}
       <MusicToggle />
 
       {/* SECTION 1: INPUT device (always visible at top) */}
       <section className="scene-section is-input">
         <HeroParticles count={isMobile ? 18 : 36} />
-        <Canvas
-          shadows
-          camera={{
-            position: isMobile ? [0, 0.05, 3.9] : [0.7, 0.35, 2.75],
-            fov: isMobile ? 48 : 38,
+        {/* Canvas wrapper — desktop pre-quiz: shifted RIGHT (heading occupies left).
+            Once quiz starts → glides back to center. Mobile: always centered. */}
+        <motion.div
+          initial={false}
+          animate={{
+            x: !isMobile && !quizStarted ? "18%" : "0%",
           }}
-          gl={canvasGl}
-          dpr={[1, 2]}
+          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 2,
+          }}
         >
-          <InputScene
-            onGenerate={handleGenerate}
-            loading={loading}
-            spinRef={inputSpinRef}
-            quizKey={quizKey}
-            isMobile={isMobile}
-          />
-        </Canvas>
+          <Canvas
+            shadows
+            camera={{
+              position: isMobile ? [0, 0.05, 3.6] : [0.7, 0.35, 2.5],
+              fov: isMobile ? 48 : 38,
+            }}
+            gl={canvasGl}
+            dpr={[1, 2]}
+          >
+            <InputScene
+              onGenerate={handleGenerate}
+              onStart={handleQuizStart}
+              loading={loading}
+              spinRef={inputSpinRef}
+              quizKey={quizKey}
+              isMobile={isMobile}
+            />
+          </Canvas>
+        </motion.div>
 
         {/* ─── HERO OVERLAYS (text + brand pill on top of the 3D canvas) ─── */}
 
@@ -2797,10 +3001,10 @@ export default function App() {
             width: isMobile ? 18 : 22,
             height: isMobile ? 18 : 22,
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #b46cff 0%, #6e3fcc 100%)",
+            background: "linear-gradient(135deg, #e63d2b 0%, #a8201d 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: isMobile ? 9 : 11, fontWeight: 700, color: "#fff",
-            boxShadow: "0 0 12px rgba(180, 108, 255, 0.4)",
+            boxShadow: "0 0 12px rgba(230, 61, 43, 0.4)",
           }}>✦</div>
           <span style={{ fontSize: isMobile ? 11 : 13, color: "#ffffff", fontWeight: 500, letterSpacing: "0.01em" }}>
             BrandHero
@@ -2812,18 +3016,39 @@ export default function App() {
           )}
         </motion.div>
 
-        {/* Bottom-left big headline + scroll hint */}
-        <div style={{
-          position: "absolute",
-          bottom: isMobile ? 56 : 56,
-          left: isMobile ? 20 : 32,
-          right: isMobile ? 20 : "auto",
-          zIndex: 10,
-          maxWidth: isMobile ? "calc(100% - 40px)" : "55%",
-          pointerEvents: "none",
-          textAlign: "left",
-        }}>
+        {/* Headline — bottom-left default; lifts up slightly when quiz starts (parallel to gadget centering) */}
+        <motion.div
+          initial={false}
+          animate={{
+            y: !isMobile && quizStarted ? -120 : 0,
+          }}
+          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: "absolute",
+            bottom: isMobile ? 56 : 56,
+            left: isMobile ? 20 : 32,
+            right: isMobile ? 20 : "auto",
+            zIndex: 10,
+            maxWidth: isMobile ? "calc(100% - 40px)" : "55%",
+            pointerEvents: "none",
+            textAlign: "left",
+          }}
+        >
           <AnimatedHeadline />
+
+          {/* Subheading — sits directly below the headline (left-aligned, narrow) */}
+          <div style={{ marginTop: isMobile ? 14 : 18, maxWidth: isMobile ? "100%" : 460 }}>
+            <AnimatedTagline
+              text="Take the guesswork out of growing your brand. Identify what's blocking you, get a custom strategy, and move faster than ever."
+              delay={0.5}
+              style={{
+                fontSize: isMobile ? 13 : 14,
+                color: "rgba(255, 255, 255, 0.6)",
+                lineHeight: 1.55,
+                fontWeight: 400,
+              }}
+            />
+          </div>
 
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -2843,40 +3068,16 @@ export default function App() {
           >
             <span style={{
               width: 6, height: 6, borderRadius: "50%",
-              background: "#b46cff",
-              boxShadow: "0 0 10px #b46cff",
+              background: "#e63d2b",
+              boxShadow: "0 0 10px #e63d2b",
               animation: "pulse 2s ease-in-out infinite",
             }} />
             Answer to discover
           </motion.div>
-        </div>
-
-        {/* Bottom-right tagline — hidden on mobile (would clutter narrow viewport) */}
-        {!isMobile && (
-          <div style={{
-            position: "absolute",
-            bottom: 56,
-            right: 32,
-            zIndex: 10,
-            maxWidth: 480,
-            pointerEvents: "none",
-            textAlign: "right",
-          }}>
-            <AnimatedTagline
-              text="Take the guesswork out of growing your brand. Identify what's blocking you, get a custom strategy, and move faster than ever."
-              delay={0.5}
-              style={{
-                fontSize: 14,
-                color: "rgba(255, 255, 255, 0.6)",
-                lineHeight: 1.55,
-                fontWeight: 400,
-              }}
-            />
-          </div>
-        )}
+        </motion.div>
       </section>
 
-      {/* SECTION 2: OUTPUT device (mounts after first Generate Report click) */}
+      {/* SECTION 2: OUTPUT device — only mounts after user performs diagnose (clicks Generate) */}
       {showResult && (
         <section className="scene-section is-output" ref={outputSectionRef}>
           <Canvas
@@ -2903,13 +3104,13 @@ export default function App() {
             />
           </Canvas>
 
-          {/* Reset button — DOM overlay (model untouched). Sends user back to step 1. */}
+          {/* Reset button — visible since this section only renders post-diagnose */}
           <motion.button
             onClick={handleReset}
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(180, 108, 255, 0.18)"; e.currentTarget.style.borderColor = "rgba(180, 108, 255, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"; e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
             style={{
               position: "absolute",
@@ -2944,21 +3145,15 @@ export default function App() {
         </section>
       )}
 
-      {/* SECTION 3: SERVICES (What We Do) — replaces the previous Projects section.
-          Mounts as soon as the report appears so user can scroll to it freely.
-          Email submission triggers a cinematic scroll TO this section. */}
-      {showResult && (
-        <section className="services-wrap is-services" ref={servicesSectionRef}>
-          <ServicesSection />
-        </section>
-      )}
+      {/* SECTION 3: SERVICES (What We Do) — always rendered for initial scrollability */}
+      <section className="services-wrap is-services" ref={servicesSectionRef}>
+        <ServicesSection />
+      </section>
 
-      {/* SECTION 4: SUCCESS STORIES (Works portfolio grid) */}
-      {showResult && (
-        <section className="services-wrap is-stories">
-          <SuccessStoriesSection />
-        </section>
-      )}
+      {/* SECTION 4: SUCCESS STORIES (Works portfolio grid) — always rendered */}
+      <section className="services-wrap is-stories">
+        <SuccessStoriesSection />
+      </section>
     </>
   )
 }
