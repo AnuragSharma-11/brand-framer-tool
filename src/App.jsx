@@ -1861,7 +1861,7 @@ function ServicesSection() {
       width: "100%",
       maxWidth: 1100,
       margin: "0 auto",
-      padding: isMobile ? "56px 18px 48px" : "80px 32px 60px",
+      padding: isMobile ? "56px 18px 120px" : "80px 32px 180px",
       boxSizing: "border-box",
       position: "relative",
       zIndex: 3,
@@ -2189,6 +2189,240 @@ function ServicesSection() {
             </a>
           </div>
         </div>
+      </motion.div>
+    </div>
+  )
+}
+
+/* ---------------- SUCCESS STORIES SECTION — works portfolio grid (Section 4) ---------------- */
+const STORIES = [
+  {
+    title: "Robotspace",
+    tags: ["BRANDING", "VISUAL IDENTITY", "WEB DESIGN", "APP"],
+    image: "/stories/robotspace.png",
+    bg: "#ee5a1f",
+  },
+  {
+    title: "Klinq",
+    tags: ["APP", "WEB DESIGN", "WEB DEVELOPMENT"],
+    image: "/stories/klinq.png",
+    bg: "linear-gradient(135deg, #b86bff 0%, #ff6e8b 100%)",
+  },
+  {
+    title: "Catalytic Nutra",
+    tags: ["VISUAL IDENTITY", "WEB DESIGN", "BRANDING"],
+    image: "/stories/catalytic.png",
+    bg: "#1f3a2c",
+  },
+  {
+    title: "Mayborne Bulk",
+    tags: ["BRANDING", "LOGO", "WEB DESIGN", "DEVELOPMENT"],
+    image: "/stories/mayborne.png",
+    bg: "linear-gradient(180deg, #1c2535 0%, #5b8caa 100%)",
+  },
+]
+
+function StoryCard({ story, isMobile = false }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ display: "flex", flexDirection: "column", gap: isMobile ? 10 : 14 }}
+    >
+      {/* Image / visual area */}
+      <div style={{
+        width: "100%",
+        aspectRatio: "16 / 10",
+        borderRadius: isMobile ? 14 : 16,
+        background: story.bg,
+        backgroundImage: story.image ? `url(${story.image})` : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        overflow: "hidden",
+        transform: hover ? "translateY(-4px)" : "translateY(0)",
+        boxShadow: hover ? "0 24px 50px rgba(0,0,0,0.45)" : "0 12px 30px rgba(0,0,0,0.25)",
+        transition: "transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.4s",
+      }} />
+
+      {/* Tags */}
+      <div style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 4,
+        fontSize: isMobile ? 9 : 10,
+        color: "rgba(255, 255, 255, 0.55)",
+        letterSpacing: "0.08em",
+        fontWeight: 500,
+        fontFamily: "'Inter Tight', system-ui, sans-serif",
+        lineHeight: 1.6,
+      }}>
+        {story.tags.map((t, i) => (
+          <span key={t}>
+            {t}
+            {i < story.tags.length - 1 && <span style={{ marginLeft: 4, color: "rgba(255,255,255,0.25)" }}>|</span>}
+          </span>
+        ))}
+      </div>
+
+      {/* Title */}
+      <h3 style={{
+        margin: 0,
+        fontSize: isMobile ? 20 : 28,
+        fontWeight: 500,
+        color: "#ffffff",
+        fontFamily: "'Inter Tight', system-ui, sans-serif",
+        letterSpacing: "-0.025em",
+        lineHeight: 1.1,
+      }}>
+        {story.title}
+      </h3>
+    </div>
+  )
+}
+
+function SuccessStoriesSection() {
+  const isMobile = useIsMobile()
+
+  return (
+    <div style={{
+      width: "100%",
+      maxWidth: 1100,
+      margin: "0 auto",
+      padding: isMobile ? "100px 16px 60px" : "220px 32px 100px",
+      boxSizing: "border-box",
+      position: "relative",
+      zIndex: 3,
+    }}>
+      {/* Golden halftone dome — decorative top backdrop (real image asset) */}
+      <img
+        src="/stories/halftone.png"
+        alt=""
+        style={{
+          position: "absolute",
+          top: isMobile ? 20 : 40,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: isMobile ? "150%" : "115%",
+          maxWidth: 1700,
+          height: "auto",
+          pointerEvents: "none",
+          userSelect: "none",
+          opacity: 0.85,
+          zIndex: 0,
+        }}
+      />
+
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-15%" }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          textAlign: "center",
+          marginBottom: isMobile ? 32 : 64,
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <div style={{
+          color: "#e63d2b",
+          fontSize: isMobile ? 10 : 11,
+          letterSpacing: "0.28em",
+          textTransform: "uppercase",
+          fontWeight: 500,
+          marginBottom: isMobile ? 16 : 22,
+          fontFamily: "'Inter Tight', system-ui, sans-serif",
+        }}>
+          Works
+        </div>
+        <h2 style={{
+          margin: 0,
+          fontSize: "clamp(28px, 7vw, 76px)",
+          fontWeight: 500,
+          color: "#ffffff",
+          lineHeight: 1.05,
+          letterSpacing: "-0.025em",
+          fontFamily: "'Inter Tight', system-ui, sans-serif",
+        }}>
+          Our{" "}
+          <em style={{
+            fontFamily: "'Fraunces', Georgia, serif",
+            fontStyle: "italic",
+            fontWeight: 400,
+          }}>
+            Success Stories
+          </em>
+        </h2>
+      </motion.div>
+
+      {/* Cards grid — 2x2 on desktop, single column on mobile */}
+      <motion.div
+        initial={{ opacity: 0, y: 36 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-8%" }}
+        transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+          gap: isMobile ? 24 : 28,
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        {STORIES.map((s) => (
+          <StoryCard key={s.title} story={s} isMobile={isMobile} />
+        ))}
+      </motion.div>
+
+      {/* SEE ALL WORKS CTA — pink/cream pill, centered */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.7, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          marginTop: isMobile ? 36 : 64,
+          display: "flex",
+          justifyContent: "center",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <a
+          href={CALL_BOOKING_LINK}
+          target="_blank"
+          rel="noopener noreferrer"
+          onMouseEnter={(e) => { e.currentTarget.style.background = "#fce5d8"; playHover() }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "#f4dbcd" }}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 12,
+            background: "#f4dbcd",
+            color: "#0e0e0e",
+            padding: isMobile ? "14px 26px" : "16px 32px",
+            borderRadius: 999,
+            fontSize: isMobile ? 11 : 12,
+            fontWeight: 600,
+            letterSpacing: "0.22em",
+            textTransform: "uppercase",
+            textDecoration: "none",
+            fontFamily: "'Inter Tight', system-ui, sans-serif",
+            transition: "background 0.25s",
+          }}
+        >
+          <span style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#0e0e0e",
+            display: "inline-block",
+          }} />
+          See all works
+        </a>
       </motion.div>
     </div>
   )
@@ -2587,7 +2821,7 @@ export default function App() {
           zIndex: 10,
           maxWidth: isMobile ? "calc(100% - 40px)" : "55%",
           pointerEvents: "none",
-          textAlign: isMobile ? "left" : "left",
+          textAlign: "left",
         }}>
           <AnimatedHeadline />
 
@@ -2716,6 +2950,13 @@ export default function App() {
       {showResult && (
         <section className="services-wrap is-services" ref={servicesSectionRef}>
           <ServicesSection />
+        </section>
+      )}
+
+      {/* SECTION 4: SUCCESS STORIES (Works portfolio grid) */}
+      {showResult && (
+        <section className="services-wrap is-stories">
+          <SuccessStoriesSection />
         </section>
       )}
     </>
