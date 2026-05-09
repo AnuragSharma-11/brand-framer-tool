@@ -127,7 +127,7 @@ function MusicToggle() {
     const tryStart = () => {
       const a = audioRef.current
       if (!a) return
-      if (playing && a.paused) a.play().catch(() => {})
+      if (playing && a.paused) a.play().catch(() => { })
     }
     document.addEventListener("click", tryStart, { once: true, capture: true })
     document.addEventListener("touchstart", tryStart, { once: true, capture: true })
@@ -162,9 +162,9 @@ function MusicToggle() {
           width: 40,
           height: 40,
           borderRadius: "50%",
-          border: `1px solid ${playing ? "rgba(230, 61, 43, 0.6)" : "rgba(255, 255, 255, 0.15)"}`,
+          border: `1px solid ${playing ? "rgba(255, 82, 82, 0.6)" : "rgba(255, 255, 255, 0.15)"}`,
           background: playing
-            ? "rgba(230, 61, 43, 0.18)"
+            ? "rgba(255, 82, 82, 0.18)"
             : "rgba(0, 0, 0, 0.35)",
           backdropFilter: "blur(10px)",
           WebkitBackdropFilter: "blur(10px)",
@@ -174,9 +174,9 @@ function MusicToggle() {
           justifyContent: "center",
           transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
           boxShadow: playing
-            ? "0 0 18px rgba(230, 61, 43, 0.35)"
+            ? "0 0 18px rgba(255, 82, 82, 0.35)"
             : "0 1px 3px rgba(0, 0, 0, 0.3)",
-          color: playing ? "#e63d2b" : "rgba(255, 255, 255, 0.55)",
+          color: playing ? "#FF5252" : "rgba(255, 255, 255, 0.55)",
           padding: 0,
         }}
         onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.08)" }}
@@ -201,8 +201,8 @@ function MusicToggle() {
 }
 
 /* ---------------- QUIZ UI ---------------- */
-const ACCENT = "#e63d2b"
-const BG = "#0d0d0d"
+const ACCENT = "#FF5252"
+const BG = "#050810"
 const TEXT_PRIMARY = "#ffffff"
 const TEXT_MUTED = "#888888"
 const TEXT_DIM = "#5a5a5a"
@@ -332,10 +332,10 @@ function OptionRow({ label, selected, onClick, multiSelect = false }) {
   // Color resolution priority: selected > hover > default
   const textColor = selected ? ACCENT : hover ? "#cccccc" : TEXT_MUTED
   const bgColor = selected
-    ? hover ? "rgba(230, 61, 43, 0.10)" : "rgba(230, 61, 43, 0.05)"
+    ? hover ? "rgba(255, 82, 82, 0.10)" : "rgba(255, 82, 82, 0.05)"
     : hover ? "rgba(255, 255, 255, 0.04)" : "transparent"
   const borderColor = selected
-    ? "rgba(230, 61, 43, 0.5)"
+    ? "rgba(255, 82, 82, 0.5)"
     : hover ? "rgba(255, 255, 255, 0.08)" : "transparent"
   const chevColor = selected ? ACCENT : hover ? "#aaaaaa" : TEXT_DIM
 
@@ -525,7 +525,9 @@ function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
       cursor: "default",
       userSelect: "none",
       WebkitUserSelect: "none",
-      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(230, 61, 43, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(230, 61, 43, 0.3) inset`,
+      boxShadow: "0 0 20px rgba(255, 255, 255, 0.05), 0 0 8px rgba(255, 255, 255, 0.1) inset",
+      backfaceVisibility: "hidden",
+      WebkitBackfaceVisibility: "hidden",
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
@@ -751,26 +753,26 @@ function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
 }
 
 /* ---------------- MODEL ---------------- */
-const QUIZ_UI_W = 340
-const QUIZ_UI_H = 420
-const SCREEN_FILL = 50   // 👈 isko badhao: 1 = exact fit, 2 = 2x bada, 5 = 5x, etc.
+const QUIZ_UI_W = 364
+const QUIZ_UI_H = 400
+const SCREEN_FILL = 30 // 👈 Fine-tuned for exact fit
 
-/* 👇 MODEL APPEARANCE — Premium warm-black titanium (molten/golden-hour vibes) */
+/* 👇 MODEL APPEARANCE — Vibrant Classy Dark */
 const MODEL_LOOK = {
-  color: "#1c1717",   // warmer near-black with deeper red undertone
-  metalness: 0.95,        // sharper metallic sheen
-  roughness: 0.18,        // smoother → crisp mirror highlights
-  envIntensity: 2.6,         // stronger env reflections that catch the eye
-  envPreset: "studio",    // clean studio reflections
+  color: "#1a2235",       // Rich deep blue-steel — more vibrant than pure black
+  metalness: 0.98,        // Maximum metalness for mirror-like reflections
+  roughness: 0.18,        // Smoother = shinier = more vibrant highlights
+  envIntensity: 4.5,      // Max environment reflection
+  envPreset: "studio",
 }
 
-/* 👇 SCREEN GLOW — makes the display feel lit/active */
+/* 👇 SCREEN GLOW — neutralized */
 const SCREEN_GLOW = {
-  color: "#ff3525",   // deep saturated vermillion — molten lava feel
-  intensity: 1.5,         // brighter point-light near the screen
-  emissive: 0.85,         // stronger self-glow on the screen mesh
-  haloBlur: 75,          // larger atmospheric halo
-  haloAlpha: 0.7,        // more visible glow
+  color: "#ffffff",
+  intensity: 0,
+  emissive: 0,
+  haloBlur: 0,
+  haloAlpha: 0,
 }
 
 /* ---------------- RESULT UI (rendered on the SECOND device) ---------------- */
@@ -829,7 +831,7 @@ function PriorityRow({ num, title, description, severity }) {
         <span style={{ fontSize: 10, color: TEXT_PRIMARY, fontWeight: 600, flex: 1 }}>{title}</span>
         <span style={{ fontSize: 9, color: TEXT_DIM, flexShrink: 0 }}>{severity}/10</span>
       </div>
-      <div style={{ height: 3, background: "rgba(230, 61, 43, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 28 }}>
+      <div style={{ height: 3, background: "rgba(255, 82, 82, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 28 }}>
         <div style={{ height: "100%", width: `${fill}%`, background: ACCENT, transition: "width 0.4s ease-out" }} />
       </div>
       {description && (
@@ -869,7 +871,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
       userSelect: "none",
       WebkitUserSelect: "none",
       overflow: "hidden",
-      boxShadow: `0 0 ${SCREEN_GLOW.haloBlur}px rgba(230, 61, 43, ${SCREEN_GLOW.haloAlpha}), 0 0 8px rgba(230, 61, 43, 0.3) inset`,
+      boxShadow: "0 0 20px rgba(255, 255, 255, 0.05), 0 0 8px rgba(255, 255, 255, 0.1) inset",
     }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
@@ -881,9 +883,9 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
         /* Custom scrollbar — subtle, premium */
         .result-scroll::-webkit-scrollbar { width: 4px; }
         .result-scroll::-webkit-scrollbar-track { background: transparent; }
-        .result-scroll::-webkit-scrollbar-thumb { background: rgba(230, 61, 43, 0.3); border-radius: 2px; }
-        .result-scroll::-webkit-scrollbar-thumb:hover { background: rgba(230, 61, 43, 0.5); }
-        .result-scroll { scrollbar-width: thin; scrollbar-color: rgba(230, 61, 43, 0.3) transparent; }
+        .result-scroll::-webkit-scrollbar-thumb { background: rgba(255, 82, 82, 0.3); border-radius: 2px; }
+        .result-scroll::-webkit-scrollbar-thumb:hover { background: rgba(255, 82, 82, 0.5); }
+        .result-scroll { scrollbar-width: thin; scrollbar-color: rgba(255, 82, 82, 0.3) transparent; }
       `}</style>
 
       {/* Header — minimal "Book a call" pill on top-right when report is ready */}
@@ -913,18 +915,18 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
                 fontWeight: 700,
                 textDecoration: "none",
                 padding: "3px 8px",
-                border: `1px solid rgba(230, 61, 43, 0.4)`,
+                border: `1px solid rgba(255, 82, 82, 0.4)`,
                 borderRadius: 999,
                 transition: "all 0.15s",
-                background: "rgba(230, 61, 43, 0.06)",
+                background: "rgba(255, 82, 82, 0.06)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"
-                e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.7)"
+                e.currentTarget.style.background = "rgba(255, 82, 82, 0.18)"
+                e.currentTarget.style.borderColor = "rgba(255, 82, 82, 0.7)"
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(230, 61, 43, 0.06)"
-                e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.4)"
+                e.currentTarget.style.background = "rgba(255, 82, 82, 0.06)"
+                e.currentTarget.style.borderColor = "rgba(255, 82, 82, 0.4)"
               }}
             >
               Book Call ↗
@@ -979,8 +981,8 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
         <div className="result-scroll" style={{ flex: 1, display: "flex", flexDirection: "column", gap: 12, overflow: "auto", paddingRight: 4 }}>
           {/* TOP block — teasers + call CTA group together at the top */}
           <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-            <TeaserLine label="PROBLEM"  text={report.problem || report.diagnosis} />
-            <TeaserLine label="REASON"   text={report.reason} />
+            <TeaserLine label="PROBLEM" text={report.problem || report.diagnosis} />
+            <TeaserLine label="REASON" text={report.reason} />
             <TeaserLine label="SOLUTION" text={report.solution || report.recommendedService} accent />
           </div>
 
@@ -992,8 +994,8 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
 
           {/* BOTTOM CTA card — wraps tagline + form together, pinned to bottom via spacer above */}
           <div style={{
-            background: "rgba(230, 61, 43, 0.05)",
-            border: "1px solid rgba(230, 61, 43, 0.18)",
+            background: "rgba(255, 82, 82, 0.05)",
+            border: "1px solid rgba(255, 82, 82, 0.18)",
             borderRadius: 10,
             padding: "12px 14px",
             display: "flex",
@@ -1025,7 +1027,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
                     style={{
                       flex: 1,
                       background: "rgba(0, 0, 0, 0.4)",
-                      border: `1px solid rgba(230, 61, 43, 0.25)`,
+                      border: `1px solid rgba(255, 82, 82, 0.25)`,
                       borderRadius: 6,
                       padding: "9px 12px",
                       color: TEXT_PRIMARY,
@@ -1082,7 +1084,7 @@ function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, 
 function TabletDevice({
   position = [0, 0, 0],
   children,
-  glowColor = "#e63d2b",
+  glowColor = "#FF5252",
   glowIntensity = 1.4,
   isMobile = false,
 }) {
@@ -1308,14 +1310,58 @@ function Device({
   glowEmissive = SCREEN_GLOW.emissive,
   spinRef,
 }) {
-  const { scene } = useGLTF("/models/model.glb")
+  const { scene } = useGLTF("/models/untitled.glb")
 
   // Each Device gets a deep clone of the GLB scene + cloned materials
   const cloned = useMemo(() => {
     const c = scene.clone(true)
+
+    // Select the "last version" if there are multiple top-level objects.
+    const versions = c.children.filter((child) => {
+      let hasMesh = false
+      child.traverse((o) => { if (o.isMesh) hasMesh = true })
+      return hasMesh
+    })
+    if (versions.length > 1) {
+      const lastVersion = versions[versions.length - 1]
+      versions.forEach((v) => {
+        if (v !== lastVersion) c.remove(v)
+      })
+    }
+
+    // Auto-scale normalization
+    c.updateMatrixWorld(true)
+    const box = new THREE.Box3().setFromObject(c)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+    const maxDim = Math.max(size.x, size.y, size.z)
+    if (maxDim > 0) c.scale.setScalar(1.0 / maxDim)
+
+    // Each Device gets its own cloned materials (no shared state across instances)
     c.traverse((obj) => {
       if (obj.isMesh && obj.material) {
-        obj.material = obj.material.clone()
+        const m = obj.material.clone()
+        obj.material = m
+        const name = obj.name.toLowerCase()
+        const isScreen = name.includes("screen") || name.includes("display") || name.includes("glass") || name.includes("panel") || name.includes("front") || name.includes("plane")
+
+        if (isScreen) {
+          m.color?.set("#020202")
+          if ("metalness" in m) m.metalness = 0
+          if ("roughness" in m) m.roughness = 0.05
+        } else {
+          if (MODEL_LOOK.color !== null && m.color) m.color.set(MODEL_LOOK.color)
+          if (MODEL_LOOK.metalness !== null && "metalness" in m) m.metalness = MODEL_LOOK.metalness
+          if (MODEL_LOOK.roughness !== null && "roughness" in m) m.roughness = MODEL_LOOK.roughness
+          if ("envMapIntensity" in m) m.envMapIntensity = MODEL_LOOK.envIntensity
+
+          if (name.includes("button") || name.includes("accent") || name.includes("led") || name.includes("light")) {
+            if (m.emissive) {
+              m.emissive.set("#FF5252")
+              m.emissiveIntensity = 2.5
+            }
+          }
+        }
       }
     })
     return c
@@ -1417,7 +1463,11 @@ function Device({
       const fallback = new THREE.Box3().setFromObject(cloned)
       fallback.getSize(size)
       fallback.getCenter(center)
-      size.multiplyScalar(0.6)
+      center.z += size.z * 0.08
+      center.y -= size.y * 0.18
+      center.x += size.x * -0.02 // 👈 Change this to move Left (-) or Right (+)
+      size.x *= 0.98
+      size.y *= 1.26
     }
     const offset = new THREE.Vector3().subVectors(center, modelCenter)
     setInfo({ size, offset })
@@ -1513,30 +1563,30 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
   const deviceX = 0
   return (
     <>
-      <ambientLight intensity={0.35} />
-      <directionalLight position={[5, 6, 5]} intensity={1.1} castShadow />
-      <directionalLight position={[-5, 4, 4]} intensity={0.5} />
-      <directionalLight position={[0, 3, -5]} intensity={1.5} color="#ff8576" />
+      <ambientLight intensity={0.5} color="#FFF0F0" />
+      <directionalLight position={[5, 6, 5]} intensity={2.5} color="#ffffff" castShadow />
+      <directionalLight position={[-5, 4, 4]} intensity={1.4} color="#FF8A7A" />
+      <directionalLight position={[0, 3, -5]} intensity={1.8} color="#ffffff" />
 
-      {/* Slow-moving accent — catches the device edges as it orbits */}
-      <OrbitingAccentLight />
-      {/* Rim light from behind for edge separation */}
-      <pointLight position={[deviceX, 0.4, -3]} color="#ffc7b0" intensity={1.6} distance={6} decay={2} />
+      {/* Iron Man Gold orbiting accent */}
+      <OrbitingAccentLight color="#FF5252" intensity={3.5} />
+      {/* Arc Reactor blue rim from behind */}
+      <pointLight position={[deviceX, 0.4, -3]} color="#FF5252" intensity={3.0} distance={7} decay={2} />
 
-      {/* ⚡ Lightning pulse — slow breathing red light that throws cinematic accents on the device */}
-      <LightningPulseLight position={[deviceX - 1.2, 1.6, 1.5]} color="#ff5040" />
+      {/* Gold pulse for cinematic Iron Man feel */}
+      <LightningPulseLight position={[deviceX - 1.2, 1.6, 1.5]} color="#FF5252" />
 
-      {/* Strong key light from upper-left for premium depth — angled to catch top edge */}
-      <pointLight position={[deviceX - 2.5, 2.5, 2]} color="#ff8576" intensity={1.4} distance={6} decay={2} />
-      {/* Cool counter-fill from lower right — adds dimension */}
-      <pointLight position={[deviceX + 1.8, -1.2, 1.2]} color="#ffd0a8" intensity={0.7} distance={5} decay={2.5} />
+      {/* Strong warm gold key light from upper-left */}
+      <pointLight position={[deviceX - 2.5, 2.5, 2]} color="#FF6B6B" intensity={2.8} distance={7} decay={2} />
+      {/* Arc reactor blue fill from lower right */}
+      <pointLight position={[deviceX + 1.8, -1.2, 1.2]} color="#FF7B7B" intensity={1.8} distance={6} decay={2} />
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
       <Suspense fallback={<FallbackBox />}>
         <Device
           position={[deviceX, deviceY, 0]}
-          glowColor="#e63d2b"
+          glowColor="#ffffff"
           spinRef={spinRef}
         >
           <QuizUI
@@ -1617,7 +1667,7 @@ function OutputScene({ report, loading, error, onRetry, contact, setContact, sen
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
-      <TabletDevice position={[0, 0, 0]} glowColor="#e63d2b" isMobile={isMobile}>
+      <TabletDevice position={[0, 0, 0]} glowColor="#FF5252" isMobile={isMobile}>
         <ResultUI
           report={report}
           loading={loading}
@@ -1656,7 +1706,7 @@ const PROJECTS = [
     category: "Brand Positioning",
     description: "Repositioned a 4-yr healthcare SaaS from 'compliance tool' to 'clinical workflow OS' — won 3 enterprise deals in Q1.",
     tag: "Healthcare",
-    color: "#e63d2b",
+    color: "#FF5252",
   },
   {
     title: "Cinder & Co.",
@@ -1696,7 +1746,7 @@ function ProjectsSection() {
       <div style={{ textAlign: "center" }}>
         <div style={{
           fontSize: isMobile ? 10 : 11,
-          color: "#e63d2b",
+          color: "#FF5252",
           letterSpacing: "0.18em",
           textTransform: "uppercase",
           fontWeight: 700,
@@ -1743,7 +1793,7 @@ function ProjectsSection() {
           href={CALL_BOOKING_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "#e63d2b", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid rgba(230,61,43,0.4)" }}
+          style={{ color: "#FF5252", textDecoration: "none", fontWeight: 600, borderBottom: "1px solid rgba(230,61,43,0.4)" }}
         >
           Book a call →
         </a>
@@ -1767,7 +1817,7 @@ function ProjectCard({ project, index }) {
         cursor: "pointer",
         transition: "transform 0.3s cubic-bezier(0.22,1,0.36,1), border-color 0.3s, box-shadow 0.3s",
         transform: hover ? "translateY(-4px)" : "translateY(0)",
-        boxShadow: hover ? "0 16px 40px rgba(230, 61, 43, 0.15)" : "0 2px 8px rgba(0,0,0,0.3)",
+        boxShadow: hover ? "0 16px 40px rgba(255, 82, 82, 0.15)" : "0 2px 8px rgba(0,0,0,0.3)",
         animation: `result-block-in 0.7s cubic-bezier(0.22,1,0.36,1) ${index * 0.12}s both`,
       }}
     >
@@ -2265,13 +2315,13 @@ function ReportSentPopup({ visible }) {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             style={{
               background: "linear-gradient(135deg, rgba(20, 14, 14, 0.98) 0%, rgba(28, 20, 20, 0.95) 100%)",
-              border: "1px solid rgba(230, 61, 43, 0.35)",
+              border: "1px solid rgba(255, 82, 82, 0.35)",
               borderRadius: 28,
               padding: "52px 48px",
               textAlign: "center",
               maxWidth: 480,
               width: "100%",
-              boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(230, 61, 43, 0.18)",
+              boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 82, 82, 0.18)",
               fontFamily: "'Inter Tight', system-ui, sans-serif",
             }}
           >
@@ -2285,11 +2335,11 @@ function ReportSentPopup({ visible }) {
                 height: 84,
                 borderRadius: "50%",
                 margin: "0 auto 28px",
-                background: "linear-gradient(135deg, #ff5a4a 0%, #e63d2b 100%)",
+                background: "linear-gradient(135deg, #ff5a4a 0%, #FF5252 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                boxShadow: "0 0 50px rgba(230, 61, 43, 0.5), 0 8px 24px rgba(230, 61, 43, 0.3)",
+                boxShadow: "0 0 50px rgba(255, 82, 82, 0.5), 0 8px 24px rgba(255, 82, 82, 0.3)",
               }}
             >
               <motion.svg
@@ -2322,7 +2372,7 @@ function ReportSentPopup({ visible }) {
               transition={{ duration: 0.5, delay: 0.7 }}
               style={{
                 fontSize: 11,
-                color: "#e63d2b",
+                color: "#FF5252",
                 letterSpacing: "0.28em",
                 textTransform: "uppercase",
                 fontWeight: 600,
@@ -2615,7 +2665,7 @@ function AnimatedHeadline() {
   const lines = [
     {
       text: "Creative strategy,",
-      color: "#ffffff",
+      color: "#FFFFFF",            // Arc Reactor cool white
       fontFamily: "'Inter Tight', system-ui, sans-serif",
       fontStyle: "normal",
       fontWeight: 300,
@@ -2623,7 +2673,7 @@ function AnimatedHeadline() {
     },
     {
       text: "decoded.",
-      color: "#e63d2b",
+      color: "#FF5252",            // Iron Man Gold
       fontFamily: "'Fraunces', Georgia, serif",
       fontStyle: "italic",
       fontWeight: 300,
@@ -2637,7 +2687,7 @@ function AnimatedHeadline() {
   }
   const child = {
     hidden: { opacity: 0, y: 28, filter: "blur(10px)" },
-    show:   {
+    show: {
       opacity: 1, y: 0, filter: "blur(0px)",
       transition: { duration: 0.85, ease: [0.22, 1, 0.36, 1] },
     },
@@ -2696,7 +2746,7 @@ function AnimatedTagline({ text, delay = 0.5, style = {} }) {
   }
   const child = {
     hidden: { opacity: 0, x: 24, filter: "blur(5px)" },
-    show:   {
+    show: {
       opacity: 1, x: 0, filter: "blur(0px)",
       transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
     },
@@ -2755,8 +2805,8 @@ function HeroParticles({ count = 36 }) {
             width: p.size,
             height: p.size,
             borderRadius: "50%",
-            background: "#e63d2b",
-            boxShadow: `0 0 ${p.size * 3}px rgba(230, 61, 43, 0.6)`,
+            background: "#FF5252",
+            boxShadow: `0 0 ${p.size * 3}px rgba(255, 82, 82, 0.7)`,
             opacity: p.opacity,
             animation: `particle-float ${p.duration}s ease-in-out ${p.delay}s infinite`,
             "--drift": `${p.drift}px`,
@@ -3001,10 +3051,10 @@ export default function App() {
             width: isMobile ? 18 : 22,
             height: isMobile ? 18 : 22,
             borderRadius: "50%",
-            background: "linear-gradient(135deg, #e63d2b 0%, #a8201d 100%)",
+            background: "linear-gradient(135deg, #FF5252 0%, #a8201d 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
             fontSize: isMobile ? 9 : 11, fontWeight: 700, color: "#fff",
-            boxShadow: "0 0 12px rgba(230, 61, 43, 0.4)",
+            boxShadow: "0 0 12px rgba(255, 82, 82, 0.4)",
           }}>✦</div>
           <span style={{ fontSize: isMobile ? 11 : 13, color: "#ffffff", fontWeight: 500, letterSpacing: "0.01em" }}>
             BrandHero
@@ -3068,8 +3118,8 @@ export default function App() {
           >
             <span style={{
               width: 6, height: 6, borderRadius: "50%",
-              background: "#e63d2b",
-              boxShadow: "0 0 10px #e63d2b",
+              background: "#FF5252",
+              boxShadow: "0 0 10px #FF5252",
               animation: "pulse 2s ease-in-out infinite",
             }} />
             Answer to discover
@@ -3110,7 +3160,7 @@ export default function App() {
             initial={{ opacity: 0, x: -16 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"; e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 82, 82, 0.18)"; e.currentTarget.style.borderColor = "rgba(255, 82, 82, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
             style={{
               position: "absolute",
@@ -3159,4 +3209,4 @@ export default function App() {
 }
 
 /* ---------------- PRELOAD ---------------- */
-useGLTF.preload("/models/model.glb")
+useGLTF.preload("/models/untitled.glb")
