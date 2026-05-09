@@ -1463,7 +1463,7 @@ function Device({
       const fallback = new THREE.Box3().setFromObject(cloned)
       fallback.getSize(size)
       fallback.getCenter(center)
-      center.z += size.z * 0.08
+      center.z += size.z * 0.09
       center.y -= size.y * 0.18
       center.x += size.x * -0.02 // 👈 Change this to move Left (-) or Right (+)
       size.x *= 0.98
