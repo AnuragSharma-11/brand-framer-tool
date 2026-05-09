@@ -1463,9 +1463,9 @@ function Device({
       const fallback = new THREE.Box3().setFromObject(cloned)
       fallback.getSize(size)
       fallback.getCenter(center)
-      center.z += size.z * 0.09
+      center.z += size.z * 0.19
       center.y -= size.y * 0.18
-      center.x += size.x * -0.02 // 👈 Change this to move Left (-) or Right (+)
+      center.x += size.x * -0.02
       size.x *= 0.98
       size.y *= 1.26
     }
@@ -1485,7 +1485,7 @@ function Device({
             position={[
               info.offset.x,
               info.offset.y + 0.27,
-              info.offset.z + info.size.z / 13 + 0.3,
+              info.offset.z + 0.3,
             ]}
             color={glowColor}
             intensity={glowIntensity}
@@ -1494,16 +1494,17 @@ function Device({
           />
           <Html
             transform
-            occlude
             position={[
               info.offset.x,
               info.offset.y + 0.27,
-              info.offset.z + info.size.z / 13 + 0.1,
+              info.offset.z + 0.08,
             ]}
             scale={Math.min(
               info.size.x / QUIZ_UI_W,
               info.size.y / QUIZ_UI_H
             ) * SCREEN_FILL}
+            zIndexRange={[100, 0]}
+            style={{ pointerEvents: "auto" }}
           >
             {children}
           </Html>
