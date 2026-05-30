@@ -1286,6 +1286,7 @@ function Device({
   glowIntensity = SCREEN_GLOW.intensity,
   glowEmissive = SCREEN_GLOW.emissive,
   spinRef,
+  isMobile = false,
 }) {
   const { scene } = useGLTF("/models/untitled.glb")
   const modelRef = useRef()
@@ -1425,8 +1426,13 @@ function Device({
       const eIn = 1 - Math.exp(-10 * dt)
       sp.x += (state.pointer.x - sp.x) * eIn
       sp.y += (state.pointer.y - sp.y) * eIn
+    } else if (isMobile) {
+      // ── MOBILE: NO mouse-tracking. OrbitControls handles all touch rotation.
+      // The device just sits at its resting Y rotation (set by spin choreography).
+      // This avoids the "spinning" feel when touch + tracking compete.
+      // No-op — restingYRef.current already drives groupRef.current.rotation.y via the spin code above.
     } else {
-      // ── SLEEK MOUSE TRACKING — minimal, refined, never distracting ──
+      // ── DESKTOP SLEEK MOUSE TRACKING — minimal, refined, never distracting ──
       // Stage 1: soft low-pass filter on cursor (lower stiffness → smoother input).
       const sp = smoothPointerRef.current
       const pointerEase = 1 - Math.exp(-6 * dt)
@@ -1746,6 +1752,7 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
           position={[deviceX, deviceY, 0]}
           glowColor="#ffffff"
           spinRef={spinRef}
+          isMobile={isMobile}
         >
           <QuizUI
             key={quizKey}
@@ -1784,10 +1791,12 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         enablePan={false}
         enableRotate={true}
         enableDamping
-        dampingFactor={0.08}
-        rotateSpeed={isMobile ? 1.0 : 0.7}
-        minPolarAngle={Math.PI / 3.5}
-        maxPolarAngle={Math.PI / 1.8}
+        dampingFactor={isMobile ? 0.12 : 0.08}
+        rotateSpeed={isMobile ? 0.45 : 0.7}
+        /* Constrain vertical drag tighter on mobile so the model can't flip past
+           viewer-friendly angles when fingers wander. */
+        minPolarAngle={isMobile ? Math.PI / 2.6 : Math.PI / 3.5}
+        maxPolarAngle={isMobile ? Math.PI / 1.95 : Math.PI / 1.8}
         target={[deviceX, deviceY, 0]}
         /* Mobile touch: single-finger rotation (no zoom, no pan).
            This requires canvas touch-action to allow horizontal/rotational gestures. */
@@ -4359,9 +4368,9 @@ export default function App() {
         >
           <Canvas
             camera={{
-              // Mobile: camera moved closer + tighter FOV so the 3D device fills the viewport
-              position: isMobile ? [0, 0.05, 2.4] : [0.7, 0.35, 2.5],
-              fov: isMobile ? 42 : 38,
+              // Mobile: balanced distance + FOV so the device fills the viewport without cropping
+              position: isMobile ? [0, 0.05, 3.0] : [0.7, 0.35, 2.5],
+              fov: isMobile ? 50 : 38,
             }}
             gl={canvasGl}
             dpr={isMobile ? [1, 1.5] : [1, 2]}
