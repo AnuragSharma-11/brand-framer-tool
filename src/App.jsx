@@ -24,7 +24,7 @@ function getAudioCtx() {
   if (!_audioCtx) {
     try {
       _audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    } catch (e) {
+    } catch {
       return null
     }
   }
@@ -46,6 +46,24 @@ function playTone({ freq, type = "sine", volume = 0.08, attack = 0.005, duration
   osc.connect(gain).connect(ctx.destination)
   osc.start(t)
   osc.stop(t + duration + 0.02)
+}
+
+// Mute every other audio source — used when the hero bg video starts so its
+// own soundtrack plays cleanly. Pauses HTML <audio> elements (ambient music)
+// AND suspends the Web Audio context (UI hover/select tones).
+function muteOtherAudio() {
+  document.querySelectorAll("audio").forEach((a) => { try { a.pause() } catch { /* ignore */ } })
+  if (_audioCtx && _audioCtx.state === "running") {
+    try { _audioCtx.suspend() } catch { /* ignore */ }
+  }
+}
+
+// Re-enable the Web Audio context so UI sounds work again after the video ends.
+// Ambient music stays paused — user can manually re-toggle via the MusicToggle button.
+function resumeOtherAudio() {
+  if (_audioCtx && _audioCtx.state === "suspended") {
+    try { _audioCtx.resume() } catch { /* ignore */ }
+  }
 }
 
 // Subtle high-pitched tick — feels light, non-intrusive
@@ -72,8 +90,13 @@ const AMBIENT_MUSIC_VOLUME = 0.25
 
 /* ---------------- CINEMATIC SCROLL ---------------- */
 // Custom luxury smooth scroll. `target` can be a DOM element OR a function returning one.
+// Returns a cancel() function that aborts the scroll mid-flight — prevents competing
+// RAF loops when two scrolls trigger back-to-back.
 function smoothScrollToElement(target, { duration = 3000, delay = 0, offset = 0 } = {}) {
-  setTimeout(() => {
+  let cancelled = false
+  let rafId = 0
+  const timeoutId = setTimeout(() => {
+    if (cancelled) return
     const el = typeof target === "function" ? target() : target
     if (!el) return
     const startY = window.scrollY || document.documentElement.scrollTop
@@ -86,13 +109,20 @@ function smoothScrollToElement(target, { duration = 3000, delay = 0, offset = 0 
     const ease = (t) => (t < 0.5 ? 16 * t * t * t * t * t : 1 - Math.pow(-2 * t + 2, 5) / 2)
 
     function step(now) {
+      if (cancelled) return
       const elapsed = now - startTime
       const p = Math.min(elapsed / duration, 1)
       window.scrollTo({ top: startY + distance * ease(p), behavior: "auto" })
-      if (p < 1) requestAnimationFrame(step)
+      if (p < 1) rafId = requestAnimationFrame(step)
     }
-    requestAnimationFrame(step)
+    rafId = requestAnimationFrame(step)
   }, delay)
+
+  return () => {
+    cancelled = true
+    clearTimeout(timeoutId)
+    if (rafId) cancelAnimationFrame(rafId)
+  }
 }
 
 /* ---------------- MUSIC TOGGLE BUTTON (fixed top-right) ---------------- */
@@ -156,7 +186,7 @@ function MusicToggle() {
         transition={{ duration: 0.7, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         style={{
           position: "fixed",
-          top: 18,
+          bottom: 18,
           right: 18,
           zIndex: 1000,
           width: 40,
@@ -207,12 +237,6 @@ const TEXT_PRIMARY = "#ffffff"
 const TEXT_MUTED = "#888888"
 const TEXT_DIM = "#5a5a5a"
 
-// 🟢 Diagnostic mode (Step 8 only) — lime/mono cyberpunk dashboard
-const LIME = "#b4f03d"
-const LIME_DIM = "#5a7a1f"
-const PURE_BLACK = "#000000"
-const MONO = '"Space Mono", "JetBrains Mono", "Courier New", monospace'
-
 // 📞 Call booking link (Calendly / Cal.com / mailto / tel — change to your real link)
 const CALL_BOOKING_LINK = "https://cal.com/your-handle/discovery-15min"
 
@@ -229,7 +253,7 @@ const STEPS_META = [
 
 const LIVE_PRODUCT_OPTS = ["Yes", "No"]
 const INDUSTRY_OPTS = ["Technology", "Healthcare", "Finance", "Education", "Retail", "Manufacturing", "Other"]
-const BUSINESS_AGE_OPTS = ["Less than 1 year", "1–2 years", "3–5 years", "5+ years"]
+const BUSINESS_AGE_OPTS = ["Pre-launch", "Less than 1 year", "1–2 years", "3–5 years", "5+ years"]
 const HURT_OPTS = ["Leads not converting", "Low trust", "Confusing product", "Can't compete", "I don't know"]
 const NEED_OPTS = ["Branding", "Website", "Marketing", "Product Design", "Not sure — tell me"]
 
@@ -249,81 +273,6 @@ function Chevron({ color = TEXT_DIM }) {
       <path d="M3 1.5L7 5L3 8.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
-}
-
-function SummaryRow({ label, value }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ color: TEXT_DIM, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: TEXT_PRIMARY, fontWeight: 500, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {value || "—"}
-      </span>
-    </div>
-  )
-}
-
-/* ---- Diagnostic-mode (Step 8) helpers ---- */
-function DiagSectionLabel({ children }) {
-  return (
-    <div style={{ fontSize: 9, color: LIME_DIM, letterSpacing: "0.12em", marginTop: 4 }}>
-      {`> ${children}`}
-    </div>
-  )
-}
-
-function DiagCard({ children }) {
-  return (
-    <div style={{ border: `1px solid ${LIME_DIM}`, borderRadius: 6, padding: "8px 10px" }}>
-      {children}
-    </div>
-  )
-}
-
-function IssueRow({ num, title, description, severity }) {
-  // severity 1–10 → bar fill 10–100%
-  const fill = Math.min(Math.max(severity * 10, 10), 100)
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{
-          background: LIME, color: PURE_BLACK, fontWeight: 700,
-          fontSize: 10, padding: "2px 5px", borderRadius: 3, letterSpacing: "0.04em",
-          minWidth: 22, textAlign: "center", flexShrink: 0,
-        }}>
-          {String(num).padStart(2, "0")}
-        </span>
-        <span style={{ fontSize: 11, color: LIME, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", flex: 1 }}>
-          {title}
-        </span>
-        <span style={{ fontSize: 9, color: LIME_DIM, flexShrink: 0 }}>{severity}/10</span>
-      </div>
-      {/* severity bar */}
-      <div style={{ height: 4, background: "rgba(180, 240, 61, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 30 }}>
-        <div style={{ height: "100%", width: `${fill}%`, background: LIME, transition: "width 0.4s ease-out" }} />
-      </div>
-      <div style={{ fontSize: 10, color: LIME_DIM, lineHeight: 1.4, marginLeft: 30 }}>
-        {description}
-      </div>
-    </div>
-  )
-}
-
-const diagInputStyle = {
-  width: "100%",
-  background: "transparent",
-  border: `1px solid ${LIME_DIM}`,
-  borderRadius: 6,
-  padding: "9px 12px",
-  color: LIME,
-  fontSize: 11,
-  outline: "none",
-  boxSizing: "border-box",
-  cursor: "text",
-  userSelect: "auto",
-  WebkitUserSelect: "auto",
-  fontFamily: MONO,
-  letterSpacing: "0.04em",
-  transition: "border-color 0.15s",
 }
 
 function OptionRow({ label, selected, onClick, multiSelect = false }) {
@@ -356,6 +305,7 @@ function OptionRow({ label, selected, onClick, multiSelect = false }) {
         border: `1px solid ${borderColor}`,
         background: bgColor,
         fontWeight: selected ? 500 : 400,
+        fontFamily: "'Inter', system-ui, sans-serif",
         transition: "color 0.15s, background 0.15s, border-color 0.15s, transform 0.15s",
         transform: hover && !selected && !multiSelect ? "translateX(2px)" : "translateX(0)",
       }}
@@ -421,13 +371,36 @@ function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
 
   const next = () => {
     setStep((s) => {
-      // 🔄 Spin only after Q1 answer (1→2) and Q4 answer (4→5)
-      if (s === 1 || s === 4) onAdvance?.()
+      // 🎯 Device choreography per step — values are FRACTIONS OF A FULL ROTATION (2π).
+      // Each value is a RELATIVE delta from the device's current Y rotation.
+      //   Q1 → tilt right (image 1 reference)
+      //   Q2 → tilt slightly back-left (image 2) — if liveProduct === "No", skips Q3 (URL) entirely
+      //   Q3 → more left rotation (image 3)
+      //   Q4 → swing right with right-side vent showing (image 4)
+      //   Q5 → moderate left tilt (image 5)
+      //   Q6 → FULL ROTATION (360°)
+      //   Q7 → final right-tilt pose (image 6)
+      if (s === 1) onAdvance?.(0.07)        // ~25° right
+      else if (s === 2) {
+        // Skip Q3 (URL) if user said "No" to live product — no URL to ask for.
+        const skipUrl = data.liveProduct === "No"
+        onAdvance?.(skipUrl ? 0.01 : -0.04) // combined Q2→Q3 + Q3→Q4 motion if skipping
+        return Math.min(s + (skipUrl ? 2 : 1), TOTAL_STEPS)
+      }
+      else if (s === 3) onAdvance?.(0.05)   // gentle right tilt — matches image 1 (Q4 Business Age view)
+      else if (s === 4) onAdvance?.(-0.07)  // back to near-front-facing with very slight tilt — matches new Q5 image
+      else if (s === 5) onAdvance?.(0.06)   // subtle right tilt — matches image 1 (Q6 view with right button visible)
+      else if (s === 6) onAdvance?.(1.02)   // full 360° rotation + ~7° extra right tilt (matches Q7 image — subtle right pose after spin)
+      else if (s === 7) onAdvance?.(0.08)   // ~29° right (settle pose)
       return Math.min(s + 1, TOTAL_STEPS)
     })
   }
   const back = () => {
-    setStep((s) => Math.max(s - 1, 1))
+    setStep((s) => {
+      // Mirror the skip in reverse: if user said "No" to live product, Q4 ⇽ Q2 (skip Q3).
+      if (s === 4 && data.liveProduct === "No") return 2
+      return Math.max(s - 1, 1)
+    })
   }
   const handleSelect = (key, value) => {
     setData((d) => ({ ...d, [key]: value }))
@@ -503,8 +476,17 @@ function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
     WebkitUserSelect: "auto",
   }
   const continueBtnStyle = {
-    marginTop: 10, background: ACCENT, border: "none", color: BG,
-    padding: "11px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer",
+    marginTop: 10,
+    background: "linear-gradient(135deg, #e63d2b 0%, #7a1810 60%, #1a0808 100%)",
+    border: "1px solid rgba(230, 61, 43, 0.4)",
+    color: "#ffffff",
+    padding: "11px 14px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    boxShadow: "0 4px 14px rgba(230, 61, 43, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
+    transition: "all 0.2s ease",
   }
 
   return (
@@ -526,23 +508,45 @@ function QuizUI({ onAdvance, onGenerate, onStart, loading = false }) {
       userSelect: "none",
       WebkitUserSelect: "none",
       boxShadow: "0 0 20px rgba(255, 255, 255, 0.05), 0 0 8px rgba(255, 255, 255, 0.1) inset",
-      backfaceVisibility: "hidden",
-      WebkitBackfaceVisibility: "hidden",
     }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, letterSpacing: "0.04em" }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 11,
+          letterSpacing: "0.12em",
+          fontFamily: "'Geist Mono', ui-monospace, monospace",
+          textTransform: "uppercase",
+        }}>
           <span style={{ color: ACCENT, fontWeight: 600 }}>{meta.num}</span>
           <span style={{ color: TEXT_MUTED, fontWeight: 500 }}>{meta.title}</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: "#cccccc" }}>
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          fontSize: 11,
+          color: "#cccccc",
+          fontFamily: "'Geist Mono', ui-monospace, monospace",
+          letterSpacing: "0.06em",
+        }}>
           <BatteryIcon />
           <span>100%</span>
         </div>
       </div>
 
       {/* Question */}
-      <div style={{ fontSize: 19, fontWeight: 700, lineHeight: 1.25, marginBottom: 14, color: TEXT_PRIMARY }}>
+      <div style={{
+        fontSize: 24,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        marginBottom: 14,
+        color: TEXT_PRIMARY,
+        fontFamily: "'Instrument Serif', Georgia, serif",
+        letterSpacing: "-0.005em",
+      }}>
         {meta.question}
       </div>
 
@@ -759,10 +763,10 @@ const SCREEN_FILL = 30 // 👈 Fine-tuned for exact fit
 
 /* 👇 MODEL APPEARANCE — Vibrant Classy Dark */
 const MODEL_LOOK = {
-  color: "#1a2235",       // Rich deep blue-steel — more vibrant than pure black
-  metalness: 0.98,        // Maximum metalness for mirror-like reflections
-  roughness: 0.18,        // Smoother = shinier = more vibrant highlights
-  envIntensity: 4.5,      // Max environment reflection
+  color: "#1c1c1c",       // very dark charcoal — matches reference (near-black with subtle grey)
+  metalness: 0.6,         // moderate — allows subtle edge highlights like the reference
+  roughness: 0.5,         // semi-matte — soft sheen on edges, no mirror-polish
+  envIntensity: 1.6,      // moderate reflection — visible gradient on body surface
   envPreset: "studio",
 }
 
@@ -816,33 +820,6 @@ function TeaserLine({ label, text, accent = false }) {
 }
 
 // Priority row in primary (purple) theme — used inside ResultUI
-function PriorityRow({ num, title, description, severity }) {
-  const fill = Math.min(Math.max(severity * 10, 10), 100)
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{
-          background: ACCENT, color: BG, fontWeight: 700,
-          fontSize: 9, padding: "2px 5px", borderRadius: 3, letterSpacing: "0.04em",
-          minWidth: 20, textAlign: "center", flexShrink: 0,
-        }}>
-          {String(num).padStart(2, "0")}
-        </span>
-        <span style={{ fontSize: 10, color: TEXT_PRIMARY, fontWeight: 600, flex: 1 }}>{title}</span>
-        <span style={{ fontSize: 9, color: TEXT_DIM, flexShrink: 0 }}>{severity}/10</span>
-      </div>
-      <div style={{ height: 3, background: "rgba(255, 82, 82, 0.15)", borderRadius: 2, overflow: "hidden", marginLeft: 28 }}>
-        <div style={{ height: "100%", width: `${fill}%`, background: ACCENT, transition: "width 0.4s ease-out" }} />
-      </div>
-      {description && (
-        <div style={{ fontSize: 9, color: TEXT_MUTED, lineHeight: 1.4, marginLeft: 28 }}>
-          {description}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function ResultUI({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail, isMobile = false }) {
   const isStandby = !report && !loading && !error
   // Truncate long text to keep layout clean
@@ -1311,6 +1288,17 @@ function Device({
   spinRef,
 }) {
   const { scene } = useGLTF("/models/untitled.glb")
+  const modelRef = useRef()
+
+  // Red texture — applied to body
+  const bodyTexture = useMemo(() => {
+    const tex = new THREE.TextureLoader().load("/textures/red.jpeg")
+    tex.wrapS = THREE.ClampToEdgeWrapping
+    tex.wrapT = THREE.ClampToEdgeWrapping
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.repeat.set(1, 1)
+    return tex
+  }, [])
 
   // Each Device gets a deep clone of the GLB scene + cloned materials
   const cloned = useMemo(() => {
@@ -1337,48 +1325,75 @@ function Device({
     const maxDim = Math.max(size.x, size.y, size.z)
     if (maxDim > 0) c.scale.setScalar(1.0 / maxDim)
 
-    // Each Device gets its own cloned materials (no shared state across instances)
+    // Replace materials — body meshes get a fresh MeshStandardMaterial with the texture
     c.traverse((obj) => {
       if (obj.isMesh && obj.material) {
-        const m = obj.material.clone()
-        obj.material = m
         const name = obj.name.toLowerCase()
         const isScreen = name.includes("screen") || name.includes("display") || name.includes("glass") || name.includes("panel") || name.includes("front") || name.includes("plane")
 
         if (isScreen) {
-          m.color?.set("#020202")
-          if ("metalness" in m) m.metalness = 0
-          if ("roughness" in m) m.roughness = 0.05
+          // Screen face — replace with glass-like MeshPhysicalMaterial so it picks up
+          // env reflections + clearcoat specular for visible "shine" on the face.
+          const m = new THREE.MeshPhysicalMaterial({
+            color: 0x020202,
+            metalness: 0,
+            roughness: 0.04,           // very smooth — sharp reflections
+            envMapIntensity: 1.8,      // picks up the env map prominently
+            clearcoat: 1,              // glossy coat → crisp specular highlights
+            clearcoatRoughness: 0.02,  // mirror-smooth clearcoat
+            reflectivity: 0.6,
+          })
+          obj.material = m
+          m.needsUpdate = true
         } else {
-          if (MODEL_LOOK.color !== null && m.color) m.color.set(MODEL_LOOK.color)
-          if (MODEL_LOOK.metalness !== null && "metalness" in m) m.metalness = MODEL_LOOK.metalness
-          if (MODEL_LOOK.roughness !== null && "roughness" in m) m.roughness = MODEL_LOOK.roughness
-          if ("envMapIntensity" in m) m.envMapIntensity = MODEL_LOOK.envIntensity
+          // Body — MeshPhysicalMaterial with a SUBTLE clearcoat so the top edges catch
+          // the spotLight + key directional as soft specular reflections, without losing
+          // the underlying matte body look (base roughness stays 0.9).
+          const bodyMat = new THREE.MeshPhysicalMaterial({
+            map: bodyTexture,
+            color: 0xffffff,                  // white — texture shows in true tones
+            metalness: 0.0,
+            roughness: 0.9,                   // matte base preserved
+            envMapIntensity: 0.4,             // slight env pickup so top surfaces glow softly
+            clearcoat: 0.45,                  // subtle glossy coat → light reflection on top
+            clearcoatRoughness: 0.25,         // satin (not mirror) so it's a soft sheen
+            reflectivity: 0.25,
+          })
 
           if (name.includes("button") || name.includes("accent") || name.includes("led") || name.includes("light")) {
-            if (m.emissive) {
-              m.emissive.set("#FF5252")
-              m.emissiveIntensity = 2.5
-            }
+            bodyMat.emissive = new THREE.Color("#FF5252")
+            bodyMat.emissiveIntensity = 2.5
           }
+
+          obj.material = bodyMat
         }
       }
     })
     return c
-  }, [scene])
+  }, [scene, bodyTexture])
 
   const [info, setInfo] = useState(null)
+  const [isBackFacing, setIsBackFacing] = useState(false)
   const groupRef = useRef()
+  const htmlRef = useRef()
   const animRef = useRef({ active: false, startY: 0, targetY: 0, startTime: 0, pendingDir: 0 })
-  const restingYRef = useRef(0)
+  // Initial pose — device rotated enough to clearly expose the right-side red panel
+   // strips + button + corner detail. ~-0.35 rad ≈ -20°.
+  const INITIAL_RESTING_Y = -0.35
+  const restingYRef = useRef(INITIAL_RESTING_Y)
+  const lastFaceRef = useRef(false)   // tracks previous facing state to avoid every-frame re-renders
+  // Smoothed cursor — input stage of dual smoothing for jitter-free mouse tracking
+  const smoothPointerRef = useRef({ x: 0, y: 0 })
 
   // Expose spin trigger to parent via ref
   useEffect(() => {
     if (spinRef) spinRef.current = (direction) => { animRef.current.pendingDir = direction }
   }, [spinRef])
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return
+    // Clamp delta so a tab-switch / long frame can't snap the device when focus returns
+    const dt = Math.min(delta, 0.05)
     const a = animRef.current
     if (a.pendingDir !== 0) {
       a.startY = groupRef.current.rotation.y
@@ -1388,11 +1403,13 @@ function Device({
       a.pendingDir = 0
     }
     const tNow = state.clock.elapsedTime
-    // Gentle idle float — subtle vertical bob + tiny tilt drift
+    // Gentle idle float — subtle vertical bob (absolute-time, FPS-independent already)
     groupRef.current.position.y = position[1] + Math.sin(tNow * 0.6) * 0.045
-    // Smoothly lerp X toward target so layout transitions feel cinematic, not snappy
-    groupRef.current.position.x += (position[0] - groupRef.current.position.x) * 0.04
+    // Smoothly lerp X toward target — exponential damping, frame-rate independent
+    const posEase = 1 - Math.exp(-2.5 * dt)
+    groupRef.current.position.x += (position[0] - groupRef.current.position.x) * posEase
     if (a.active) {
+      // SPIN animation — drives rotation.y toward target
       const t = tNow - a.startTime
       const p = Math.min(t / SPIN_DURATION, 1)
       const eased = 1 - Math.pow(1 - p, 3)
@@ -1403,19 +1420,63 @@ function Device({
         groupRef.current.rotation.y = settled
         restingYRef.current = settled
       }
-      return
+      // Keep cursor-smoothing in sync during spin so the device doesn't snap on exit
+      const sp = smoothPointerRef.current
+      const eIn = 1 - Math.exp(-10 * dt)
+      sp.x += (state.pointer.x - sp.x) * eIn
+      sp.y += (state.pointer.y - sp.y) * eIn
+    } else {
+      // ── SLEEK MOUSE TRACKING — minimal, refined, never distracting ──
+      // Stage 1: soft low-pass filter on cursor (lower stiffness → smoother input).
+      const sp = smoothPointerRef.current
+      const pointerEase = 1 - Math.exp(-6 * dt)
+      sp.x += (state.pointer.x - sp.x) * pointerEase
+      sp.y += (state.pointer.y - sp.y) * pointerEase
+
+      // Tracking range (radians) — VERY subtle horizontal sway (~4.6°). Refined, not reactive.
+      const Y_RANGE = 0.08
+
+      // Micro-drift — barely perceptible, just keeps the device feeling alive.
+      const driftY = Math.sin(tNow * 0.3) * 0.004
+
+      // DEAD-ZONE — cursor in lower area below the device → tracking fades to 0.
+      const rampStart = -0.1
+      const rampEnd = -0.4
+      let trackFactor = 1
+      if (state.pointer.y < rampStart) {
+        trackFactor = Math.max(0, (state.pointer.y - rampEnd) / (rampStart - rampEnd))
+      }
+
+      // Target rotation. Vertical (X) tilt locked at 0 — device always upright.
+      const targetY = restingYRef.current + sp.x * Y_RANGE * trackFactor + driftY
+      const targetX = 0
+
+      // Stage 2: gentle damping (lower stiffness → slow, premium glide).
+      const rotEase = 1 - Math.exp(-3 * dt)
+      groupRef.current.rotation.y += (targetY - groupRef.current.rotation.y) * rotEase
+      groupRef.current.rotation.x += (targetX - groupRef.current.rotation.x) * rotEase
     }
-    // Subtle mouse tracking when idle — very minimal pointer follow
-    const px = state.pointer.x
-    const py = state.pointer.y
-    const driftY = Math.sin(tNow * 0.3) * 0.012
-    const driftX = Math.sin(tNow * 0.45) * 0.008
-    const targetY = restingYRef.current + px * 0.06 + driftY
-    const targetX = py * 0.04 + driftX
-    groupRef.current.rotation.y += (targetY - groupRef.current.rotation.y) * 0.04
-    groupRef.current.rotation.x += (targetX - groupRef.current.rotation.x) * 0.04
+
+    // 🔄 Backface culling — runs EVERY frame (including during spin) so the
+    // Html overlay properly hides as the device rotates past 90° toward its back.
+    // Computes screen normal in world space vs direction to camera.
+    const worldQuat = new THREE.Quaternion()
+    groupRef.current.getWorldQuaternion(worldQuat)
+    const screenNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(worldQuat)
+
+    const worldPos = new THREE.Vector3()
+    groupRef.current.getWorldPosition(worldPos)
+    const toCamera = new THREE.Vector3().subVectors(state.camera.position, worldPos).normalize()
+
+    // Small threshold (0.1 instead of 0) so screen doesn't flicker right at edge-on (90°)
+    const isBack = screenNormal.dot(toCamera) < 0.1
+    if (isBack !== lastFaceRef.current) {
+      lastFaceRef.current = isBack
+      setIsBackFacing(isBack)
+    }
   })
 
+  // ── Geometry effect — only recomputes when the cloned model changes (not on glow tweaks). ──
   useEffect(() => {
     cloned.updateMatrixWorld(true)
     const modelBox = new THREE.Box3().setFromObject(cloned)
@@ -1423,7 +1484,6 @@ function Device({
     modelBox.getCenter(modelCenter)
 
     let screenMesh = null
-
     cloned.traverse((obj) => {
       if (obj.isMesh) {
         const name = obj.name.toLowerCase()
@@ -1432,24 +1492,6 @@ function Device({
           name.includes("glass") || name.includes("panel")
         )
         if (isScreen) screenMesh = obj
-
-        if (obj.material) {
-          const m = obj.material
-          if (isScreen) {
-            m.color?.set("#050505")
-            if ("metalness" in m) m.metalness = 0
-            if ("roughness" in m) m.roughness = 0.05
-            if (m.emissive) m.emissive.set(glowColor)
-            if ("emissiveIntensity" in m) m.emissiveIntensity = glowEmissive
-            if ("envMapIntensity" in m) m.envMapIntensity = 1
-          } else {
-            if (MODEL_LOOK.color !== null && m.color) m.color.set(MODEL_LOOK.color)
-            if (MODEL_LOOK.metalness !== null && "metalness" in m) m.metalness = MODEL_LOOK.metalness
-            if (MODEL_LOOK.roughness !== null && "roughness" in m) m.roughness = MODEL_LOOK.roughness
-            if ("envMapIntensity" in m) m.envMapIntensity = MODEL_LOOK.envIntensity
-          }
-          m.needsUpdate = true
-        }
       }
     })
 
@@ -1471,12 +1513,40 @@ function Device({
     }
     const offset = new THREE.Vector3().subVectors(center, modelCenter)
     setInfo({ size, offset })
+  }, [cloned])
+
+  // ── Screen glow effect — only touches material props of the screen mesh, runs when glow values change. ──
+  useEffect(() => {
+    cloned.traverse((obj) => {
+      if (obj.isMesh && obj.material) {
+        const name = obj.name.toLowerCase()
+        const isScreen =
+          name.includes("screen") || name.includes("display") ||
+          name.includes("glass") || name.includes("panel")
+        if (isScreen) {
+          const m = obj.material
+          if (!m.map) m.color?.set("#050505")
+          if ("metalness" in m) m.metalness = 0
+          if ("roughness" in m) m.roughness = 0.04
+          if (m.emissive) m.emissive.set(glowColor)
+          if ("emissiveIntensity" in m) m.emissiveIntensity = glowEmissive
+          // Preserve reflective glass settings from the initial material setup —
+          // these make the face actually catch env reflections.
+          if ("envMapIntensity" in m) m.envMapIntensity = 1.8
+          if ("clearcoat" in m) m.clearcoat = 1
+          if ("clearcoatRoughness" in m) m.clearcoatRoughness = 0.02
+          m.needsUpdate = true
+        }
+      }
+    })
   }, [cloned, glowColor, glowEmissive])
 
   return (
-    <group ref={groupRef} position={position}>
+    <group ref={groupRef} position={position} rotation={[0, INITIAL_RESTING_Y, 0]}>
       <Center>
-        <primitive object={cloned} scale={1.8} />
+        <group ref={modelRef}>
+          <primitive object={cloned} scale={1.8} />
+        </group>
       </Center>
 
       {info && (
@@ -1493,6 +1563,7 @@ function Device({
             decay={2}
           />
           <Html
+            ref={htmlRef}
             transform
             position={[
               info.offset.x,
@@ -1504,7 +1575,14 @@ function Device({
               info.size.y / QUIZ_UI_H
             ) * SCREEN_FILL}
             zIndexRange={[100, 0]}
-            style={{ pointerEvents: "auto" }}
+            style={{
+              pointerEvents: isBackFacing ? "none" : "auto",
+              opacity: isBackFacing ? 0 : 1,
+              visibility: isBackFacing ? "hidden" : "visible",
+              transition: "opacity 0.15s",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden"
+            }}
           >
             {children}
           </Html>
@@ -1559,28 +1637,107 @@ function OrbitingAccentLight({ radius = 3.2, height = 1.2, speed = 0.25, color =
 
 /* ---------------- INPUT SCENE — single GLB device with QuizUI ---------------- */
 function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobile = false }) {
-  // On mobile, push the device up so hero text below has room to breathe (Contra-style layout)
-  const deviceY = isMobile ? 0.55 : 0
+  // On mobile, push the device DOWN so the heading on top has room above
+  const deviceY = isMobile ? -0.35 : 0
   const deviceX = 0
+
+  // ── Lights "boot-up" sequence — model emerges from darkness on load.
+  // All lights start at intensity 0 and ramp up over ~1.8s with easeOutCubic.
+  const lightRefs = useRef({
+    ambient: null, dirKey: null, dirFill: null, dirLeft: null,
+    spot: null, rim: null, wash: null, face: null, startTime: null,
+  })
+  // Full-strength intensities (the values lights settle to)
+  const BOOT_TARGETS = {
+    ambient: 1.6, dirKey: 4.5, dirFill: 2.6, dirLeft: 3.5,
+    spot: 5, rim: 3, wash: 0.5, face: 0.6,
+  }
+  useFrame((state) => {
+    const r = lightRefs.current
+    if (r.startTime === null) r.startTime = state.clock.elapsedTime
+    const elapsed = state.clock.elapsedTime - r.startTime
+    const DURATION = 1.8
+    const p = Math.min(1, elapsed / DURATION)
+    const eased = 1 - Math.pow(1 - p, 3)   // easeOutCubic — fast start, gentle settle
+    if (r.ambient) r.ambient.intensity = BOOT_TARGETS.ambient * eased
+    if (r.dirKey)  r.dirKey.intensity  = BOOT_TARGETS.dirKey  * eased
+    if (r.dirFill) r.dirFill.intensity = BOOT_TARGETS.dirFill * eased
+    if (r.dirLeft) r.dirLeft.intensity = BOOT_TARGETS.dirLeft * eased
+    if (r.spot)    r.spot.intensity    = BOOT_TARGETS.spot    * eased
+    if (r.rim)     r.rim.intensity     = BOOT_TARGETS.rim     * eased
+    if (r.wash)    r.wash.intensity    = BOOT_TARGETS.wash    * eased
+    if (r.face)    r.face.intensity    = BOOT_TARGETS.face    * eased
+  })
+
   return (
     <>
-      <ambientLight intensity={0.5} color="#FFF0F0" />
-      <directionalLight position={[5, 6, 5]} intensity={2.5} color="#ffffff" castShadow />
-      <directionalLight position={[-5, 4, 4]} intensity={1.4} color="#FF8A7A" />
-      <directionalLight position={[0, 3, -5]} intensity={1.8} color="#ffffff" />
-
-      {/* Iron Man Gold orbiting accent */}
+      {/* ── Consolidated lighting — all start at intensity 0 and ramp up via boot useFrame above ── */}
+      <ambientLight
+        ref={(el) => { lightRefs.current.ambient = el }}
+        intensity={0}
+        color="#fff5ec"
+      />
+      {/* Key light — main illumination */}
+      <directionalLight
+        ref={(el) => { lightRefs.current.dirKey = el }}
+        position={[3, 5, 4]}
+        intensity={0}
+        color="#ffffff"
+      />
+      {/* Warm fill from opposite side */}
+      <directionalLight
+        ref={(el) => { lightRefs.current.dirFill = el }}
+        position={[-4, 3, 3]}
+        intensity={0}
+        color="#FF9080"
+      />
+      {/* Studio key spotlight — top-right-front focused beam */}
+      <spotLight
+        ref={(el) => { lightRefs.current.spot = el }}
+        position={[3, 5, 2]}
+        angle={Math.PI / 6}
+        penumbra={0.5}
+        intensity={0}
+        distance={15}
+        decay={1}
+        color="#ffffff"
+        target-position={[deviceX, deviceY, 0]}
+      />
+      {/* Left side directional — balances the spotlight */}
+      <directionalLight
+        ref={(el) => { lightRefs.current.dirLeft = el }}
+        position={[-6, 2, 3]}
+        intensity={0}
+        color="#ffffff"
+      />
+      {/* Back rim — separates device silhouette from bg */}
+      <pointLight
+        ref={(el) => { lightRefs.current.rim = el }}
+        position={[deviceX, 0.4, -3]}
+        color="#FF5252"
+        intensity={0}
+        distance={7}
+        decay={2}
+      />
+      {/* Front wash — eliminates dark voids on body */}
+      <pointLight
+        ref={(el) => { lightRefs.current.wash = el }}
+        position={[deviceX, 1, 3.5]}
+        color="#ffffff"
+        intensity={0}
+        distance={6}
+        decay={1.8}
+      />
+      {/* Face light — pure directional from straight-front, lights the SCREEN face directly.
+          Sits just above the camera line so it angles slightly down across the device face. */}
+      <directionalLight
+        ref={(el) => { lightRefs.current.face = el }}
+        position={[deviceX, 0.4, 6]}
+        intensity={0}
+        color="#ffffff"
+      />
+      {/* Single orbiting accent — keeps the dynamic motion feel */}
       <OrbitingAccentLight color="#FF5252" intensity={3.5} />
-      {/* Arc Reactor blue rim from behind */}
-      <pointLight position={[deviceX, 0.4, -3]} color="#FF5252" intensity={3.0} distance={7} decay={2} />
-
-      {/* Gold pulse for cinematic Iron Man feel */}
-      <LightningPulseLight position={[deviceX - 1.2, 1.6, 1.5]} color="#FF5252" />
-
-      {/* Strong warm gold key light from upper-left */}
-      <pointLight position={[deviceX - 2.5, 2.5, 2]} color="#FF6B6B" intensity={2.8} distance={7} decay={2} />
-      {/* Arc reactor blue fill from lower right */}
-      <pointLight position={[deviceX + 1.8, -1.2, 1.2]} color="#FF7B7B" intensity={1.8} distance={6} decay={2} />
 
       <Environment preset={MODEL_LOOK.envPreset} />
 
@@ -1592,7 +1749,7 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         >
           <QuizUI
             key={quizKey}
-            onAdvance={() => spinRef?.current?.(1)}
+            onAdvance={(amount) => spinRef?.current?.(amount)}
             onGenerate={onGenerate}
             onStart={onStart}
             loading={loading}
@@ -1600,13 +1757,24 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         </Device>
       </Suspense>
 
+      {/* Primary tight contact shadow — closely hugs the device's footprint, no wide spread */}
       <ContactShadows
-        position={[deviceX, -1.4 + deviceY, 0]}
-        opacity={0.55}
-        scale={8}
-        blur={2.4}
-        far={2}
-        resolution={1024}
+        position={[deviceX, -1.05 + deviceY, 0]}
+        opacity={1.0}
+        scale={3.5}
+        blur={0.9}
+        far={0.9}
+        resolution={512}
+        color="#000000"
+      />
+      {/* Secondary close halo — small soft falloff right around the device base for depth */}
+      <ContactShadows
+        position={[deviceX, -1.06 + deviceY, 0]}
+        opacity={0.4}
+        scale={5}
+        blur={1.8}
+        far={1.4}
+        resolution={256}
         color="#000000"
       />
 
@@ -1614,6 +1782,7 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         makeDefault
         enableZoom={false}
         enablePan={false}
+        enableRotate={!isMobile}
         enableDamping
         dampingFactor={0.08}
         rotateSpeed={0.7}
@@ -1931,7 +2100,7 @@ function ServicesSection() {
     fontSize: "clamp(20px, 1.7vw, 26px)",
     fontWeight: 500,
     color: "#ffffff",
-    fontFamily: "'Inter Tight', system-ui, sans-serif",
+    fontFamily: "'Inter', system-ui, sans-serif",
     letterSpacing: "-0.025em",
     lineHeight: 1.05,
   }
@@ -1944,7 +2113,7 @@ function ServicesSection() {
     color: "rgba(255, 255, 255, 0.78)",
     fontSize: 12,
     lineHeight: 1.5,
-    fontFamily: "'Inter Tight', system-ui, sans-serif",
+    fontFamily: "'Inter', system-ui, sans-serif",
     fontWeight: 400,
   }
 
@@ -1973,7 +2142,7 @@ function ServicesSection() {
           textTransform: "uppercase",
           fontWeight: 500,
           marginBottom: isMobile ? 14 : 22,
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, sans-serif",
         }}>
           What We Do
         </div>
@@ -1984,11 +2153,11 @@ function ServicesSection() {
           color: "#ffffff",
           lineHeight: 1.05,
           letterSpacing: "-0.03em",
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, sans-serif",
         }}>
           We Engineer{" "}
           <em style={{
-            fontFamily: "'Fraunces', Georgia, serif",
+            fontFamily: "'Instrument Serif', Georgia, serif",
             fontStyle: "italic",
             fontWeight: 400,
           }}>
@@ -2266,7 +2435,7 @@ function ServicesSection() {
                 letterSpacing: "0.22em",
                 textTransform: "uppercase",
                 textDecoration: "none",
-                fontFamily: "'Inter Tight', system-ui, sans-serif",
+                fontFamily: "'Inter', system-ui, sans-serif",
                 transition: "background 0.25s",
               }}
             >
@@ -2323,7 +2492,7 @@ function ReportSentPopup({ visible }) {
               maxWidth: 480,
               width: "100%",
               boxShadow: "0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 82, 82, 0.18)",
-              fontFamily: "'Inter Tight', system-ui, sans-serif",
+              fontFamily: "'Inter', system-ui, sans-serif",
             }}
           >
             {/* Animated checkmark circle */}
@@ -2336,7 +2505,7 @@ function ReportSentPopup({ visible }) {
                 height: 84,
                 borderRadius: "50%",
                 margin: "0 auto 28px",
-                background: "linear-gradient(135deg, #ff5a4a 0%, #FF5252 100%)",
+                background: "linear-gradient(135deg, #0d0000 0%, #9B1C1C 100%)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -2399,7 +2568,7 @@ function ReportSentPopup({ visible }) {
               }}
             >
               Report sent to{" "}
-              <em style={{ fontFamily: "'Fraunces', Georgia, serif", fontStyle: "italic", color: "#ff7a6a" }}>
+              <em style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontStyle: "italic", color: "#ff7a6a" }}>
                 your inbox
               </em>
             </motion.h2>
@@ -2488,7 +2657,7 @@ function StoryCard({ story, isMobile = false }) {
         color: "rgba(255, 255, 255, 0.55)",
         letterSpacing: "0.08em",
         fontWeight: 500,
-        fontFamily: "'Inter Tight', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, sans-serif",
         lineHeight: 1.6,
       }}>
         {story.tags.map((t, i) => (
@@ -2505,7 +2674,7 @@ function StoryCard({ story, isMobile = false }) {
         fontSize: isMobile ? 20 : 28,
         fontWeight: 500,
         color: "#ffffff",
-        fontFamily: "'Inter Tight', system-ui, sans-serif",
+        fontFamily: "'Inter', system-ui, sans-serif",
         letterSpacing: "-0.025em",
         lineHeight: 1.1,
       }}>
@@ -2567,7 +2736,7 @@ function SuccessStoriesSection() {
           textTransform: "uppercase",
           fontWeight: 500,
           marginBottom: isMobile ? 16 : 22,
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, sans-serif",
         }}>
           Works
         </div>
@@ -2578,11 +2747,11 @@ function SuccessStoriesSection() {
           color: "#ffffff",
           lineHeight: 1.05,
           letterSpacing: "-0.025em",
-          fontFamily: "'Inter Tight', system-ui, sans-serif",
+          fontFamily: "'Inter', system-ui, sans-serif",
         }}>
           Our{" "}
           <em style={{
-            fontFamily: "'Fraunces', Georgia, serif",
+            fontFamily: "'Instrument Serif', Georgia, serif",
             fontStyle: "italic",
             fontWeight: 400,
           }}>
@@ -2643,7 +2812,7 @@ function SuccessStoriesSection() {
             letterSpacing: "0.22em",
             textTransform: "uppercase",
             textDecoration: "none",
-            fontFamily: "'Inter Tight', system-ui, sans-serif",
+            fontFamily: "'Inter', system-ui, sans-serif",
             transition: "background 0.25s",
           }}
         >
@@ -2665,19 +2834,19 @@ function SuccessStoriesSection() {
 function AnimatedHeadline() {
   const lines = [
     {
-      text: "Creative strategy,",
-      color: "#FFFFFF",            // Arc Reactor cool white
-      fontFamily: "'Inter Tight', system-ui, sans-serif",
+      text: "Brand strategy",
+      color: "#FFFFFF",
+      fontFamily: "'Instrument Serif', Georgia, serif",
       fontStyle: "normal",
-      fontWeight: 300,
-      letterSpacing: "-0.04em",
+      fontWeight: 400,
+      letterSpacing: "-0.02em",
     },
     {
-      text: "decoded.",
-      color: "#FF5252",            // Iron Man Gold
-      fontFamily: "'Fraunces', Georgia, serif",
+      text: "that wins.",
+      color: "#FF4547",
+      fontFamily: "'Instrument Serif', Georgia, serif",
       fontStyle: "italic",
-      fontWeight: 300,
+      fontWeight: 400,
       letterSpacing: "-0.02em",
     },
   ]
@@ -2715,6 +2884,7 @@ function AnimatedHeadline() {
             fontStyle: line.fontStyle,
             fontWeight: line.fontWeight,
             letterSpacing: line.letterSpacing,
+            textShadow: line.textShadow,
           }}
         >
           {line.text.split(" ").map((word, wi) => (
@@ -2773,7 +2943,977 @@ function AnimatedTagline({ text, delay = 0.5, style = {} }) {
   )
 }
 
+/* ---------------- DIAGNOSIS ENGINE BADGE — sci-fi status pill below the subheading ----------------
+   Bordered red box with a pulsing red dot, monospace "DIAGNOSIS ENGINE: ONLINE" label,
+   and an animated ECG/heartbeat line on the right. Matches the futuristic hero aesthetic. */
+function DiagnosisEngineBadge({ isMobile = false }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12, filter: "blur(6px)" }}
+      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      transition={{ duration: 0.9, delay: 1.4, ease: [0.22, 1, 0.36, 1] }}
+      style={{
+        marginTop: isMobile ? 20 : 28,
+        maxWidth: isMobile ? "100%" : 420,
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: isMobile ? 10 : 12,
+        padding: isMobile ? "9px 12px" : "11px 16px",
+        background: "linear-gradient(135deg, rgba(45, 8, 8, 0.55) 0%, rgba(15, 4, 4, 0.45) 100%)",
+        border: "1px solid rgba(255, 69, 71, 0.35)",
+        borderRadius: 8,
+        boxShadow: "0 0 28px rgba(255, 69, 71, 0.18), inset 0 0 12px rgba(255, 69, 71, 0.06)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        boxSizing: "border-box",
+      }}
+    >
+      {/* Pulsing status dot */}
+      <span style={{
+        width: isMobile ? 8 : 9,
+        height: isMobile ? 8 : 9,
+        borderRadius: "50%",
+        background: "#FF4547",
+        boxShadow: "0 0 10px #FF4547, 0 0 18px rgba(255, 69, 71, 0.6)",
+        animation: "pulse 1.6s ease-in-out infinite",
+        flexShrink: 0,
+      }} />
+
+      {/* Label */}
+      <span style={{
+        fontFamily: "'Geist Mono', ui-monospace, monospace",
+        fontSize: isMobile ? 9 : 11,
+        letterSpacing: isMobile ? "0.14em" : "0.18em",
+        textTransform: "uppercase",
+        color: "#FF4547",
+        fontWeight: 500,
+        flexShrink: 0,
+        whiteSpace: "nowrap",
+      }}>
+        Diagnosis Engine: Online
+      </span>
+
+      {/* ECG / heartbeat line — fills remaining space, drawn animation */}
+      <svg
+        viewBox="0 0 100 16"
+        width="100%"
+        height="16"
+        preserveAspectRatio="none"
+        style={{ flex: 1, minWidth: 60, opacity: 0.85 }}
+        aria-hidden="true"
+      >
+        <motion.polyline
+          points="0,8 14,8 18,4 22,12 26,8 40,8 44,2 48,14 52,8 66,8 70,5 74,11 78,8 100,8"
+          fill="none"
+          stroke="#FF4547"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={{ duration: 1.4, delay: 1.7, ease: [0.22, 1, 0.36, 1] }}
+          style={{ filter: "drop-shadow(0 0 4px rgba(255, 69, 71, 0.7))" }}
+        />
+      </svg>
+    </motion.div>
+  )
+}
+
+/* ---------------- REPORT SECTION — DOM-based immersive layout (replaces the 3D tablet) ---------------- */
+function ReportSection({ report, loading, error, onRetry, contact, setContact, sent, sending, sendError, onSendEmail, isMobile = false, onReset }) {
+  const isStandby = !report && !loading && !error
+
+  return (
+    <div style={{
+      width: "100%",
+      maxWidth: 1400,
+      margin: "0 auto",
+      padding: isMobile ? "60px 16px 60px" : "70px 60px 80px",
+      boxSizing: "border-box",
+      position: "relative",
+      zIndex: 3,
+    }}>
+      {/* Reset / Start Over pill — top-left */}
+      {onReset && (
+        <motion.button
+          onClick={onReset}
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"; e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
+          style={{
+            position: "absolute",
+            top: isMobile ? 16 : 28,
+            left: isMobile ? 16 : 32,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: isMobile ? "7px 14px" : "9px 16px",
+            background: "rgba(255, 255, 255, 0.04)",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            borderRadius: 999,
+            fontSize: isMobile ? 10 : 11,
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontWeight: 500,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "rgba(255, 255, 255, 0.7)",
+            cursor: "pointer",
+            transition: "background 0.2s, color 0.2s, border-color 0.2s",
+            zIndex: 4,
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
+          Start Over
+        </motion.button>
+      )}
+
+      {/* ─── Header (eyebrow + big heading, centered) ─── */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        style={{ textAlign: "center", marginBottom: isMobile ? 40 : 64 }}
+      >
+        <div style={{
+          color: "#FF4547",
+          fontSize: isMobile ? 10 : 12,
+          letterSpacing: "0.26em",
+          textTransform: "uppercase",
+          fontWeight: 500,
+          marginBottom: isMobile ? 14 : 22,
+          fontFamily: "'Geist Mono', ui-monospace, monospace",
+        }}>
+          {loading && "Analyzing your answers"}
+          {error && "Something went wrong"}
+          {(report || isStandby) && "Strategic Diagnosis · Complete"}
+        </div>
+        <h2 style={{
+          margin: 0,
+          fontSize: isMobile ? "clamp(36px, 10vw, 56px)" : "clamp(56px, 6.5vw, 96px)",
+          fontWeight: 400,
+          color: "#ffffff",
+          lineHeight: 1.02,
+          letterSpacing: "-0.02em",
+          fontFamily: "'Instrument Serif', Georgia, serif",
+        }}>
+          {loading && "Reading the signals…"}
+          {error && <>Unable to <em style={{ fontStyle: "italic", color: "#ff6b6b" }}>connect</em></>}
+          {(report || isStandby) && "Here's what's holding you back"}
+        </h2>
+      </motion.div>
+
+      {/* ─── LOADING STATE ─── */}
+      {loading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "60px 20px",
+            gap: 20,
+          }}
+        >
+          <div style={{
+            width: 56, height: 56, borderRadius: "50%",
+            border: "3px solid rgba(255, 69, 71, 0.15)",
+            borderTopColor: "#FF4547",
+            animation: "spin 0.9s linear infinite",
+          }} />
+          <div style={{
+            fontSize: 12,
+            color: "rgba(255, 255, 255, 0.55)",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            fontFamily: "'Geist Mono', ui-monospace, monospace",
+            animation: "pulse 1.4s ease-in-out infinite",
+          }}>
+            Diagnosing your brand…
+          </div>
+        </motion.div>
+      )}
+
+      {/* ─── ERROR STATE ─── */}
+      {error && !loading && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 20,
+            padding: "40px 20px",
+            maxWidth: 500,
+            margin: "0 auto",
+            textAlign: "center",
+          }}
+        >
+          <div style={{
+            fontSize: 14, color: "rgba(255, 255, 255, 0.7)", lineHeight: 1.55,
+            fontFamily: "'Inter', system-ui, sans-serif",
+          }}>
+            {error}
+          </div>
+          <button
+            onClick={onRetry}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.95)"; playHover() }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#e63d2b" }}
+            style={{
+              padding: "12px 24px",
+              background: "#e63d2b",
+              color: "#fff",
+              border: "none",
+              borderRadius: 999,
+              fontSize: 12,
+              fontWeight: 600,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              fontFamily: "'Inter', system-ui, sans-serif",
+              transition: "background 0.2s",
+            }}
+          >
+            Try again
+          </button>
+        </motion.div>
+      )}
+
+      {/* ─── REPORT — 3-cell grid + bottom hourglass/form row ─── */}
+      {report && !loading && !error && (
+        <>
+          {/* Three diagnostic cells — borders form a clean editorial grid */}
+          <motion.div
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: {},
+              show: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+            }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr",
+              borderTop: "1px solid rgba(255, 255, 255, 0.10)",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.10)",
+              background: "#0F0F0F",
+            }}
+          >
+            <ReportCell
+              num="01"
+              label="PROBLEM"
+              accent="#FF4547"
+              iconBg="rgba(255, 69, 71, 0.14)"
+              iconBorder="rgba(255, 69, 71, 0.40)"
+              icon={<WarningIcon />}
+              text={report.problem || report.diagnosis}
+              isMobile={isMobile}
+              hasRightBorder={!isMobile}
+            />
+            <ReportCell
+              num="02"
+              label="ROOT CAUSE"
+              accent="#7a6dff"
+              iconBg="rgba(122, 109, 255, 0.14)"
+              iconBorder="rgba(122, 109, 255, 0.40)"
+              icon={<SqrtIcon />}
+              text={report.reason}
+              isMobile={isMobile}
+              hasRightBorder={!isMobile}
+            />
+            <ReportCell
+              num="03"
+              label="MOVE"
+              accent="#bda685"
+              iconBg="rgba(189, 166, 133, 0.12)"
+              iconBorder="rgba(189, 166, 133, 0.32)"
+              icon={<MoveIcon />}
+              text={report.solution || report.recommendedService}
+              isMobile={isMobile}
+              hasRightBorder={false}
+            />
+          </motion.div>
+
+          {/* Bottom row — hourglass | description | form */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1.25fr 1fr",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.10)",
+            }}
+          >
+            {/* ── Hourglass column ── image fits inside cell, aspect ratio preserved ── */}
+            <div style={{
+              padding: 0,
+              borderRight: isMobile ? "none" : "1px solid rgba(255, 255, 255, 0.10)",
+              borderBottom: isMobile ? "1px solid rgba(255, 255, 255, 0.10)" : "none",
+              minHeight: 280,
+              background: "#0F0F0F",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}>
+              <img
+                src="/services/hourglass.png"
+                alt="Brand impact hourglass"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+
+            {/* ── Description column ── */}
+            <div style={{
+              padding: isMobile ? "32px 24px" : "44px 40px",
+              borderRight: "none",
+              borderBottom: isMobile ? "1px solid rgba(255, 255, 255, 0.10)" : "none",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              background: "#0F0F0F",
+            }}>
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 9,
+                marginBottom: 16,
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "#FF4547",
+                  boxShadow: "0 0 10px rgba(255, 69, 71, 0.7)",
+                  flexShrink: 0,
+                }} />
+                <span style={{
+                  fontSize: 11,
+                  color: "#FF4547",
+                  letterSpacing: "0.22em",
+                  textTransform: "uppercase",
+                  fontWeight: 500,
+                  fontFamily: "'Geist Mono', ui-monospace, monospace",
+                }}>
+                  Get Full Report
+                </span>
+              </div>
+              <h3 style={{
+                margin: 0,
+                marginBottom: 14,
+                fontSize: isMobile ? 26 : 38,
+                fontWeight: 400,
+                color: "#ffffff",
+                lineHeight: 1.12,
+                letterSpacing: "-0.015em",
+                fontFamily: "'Instrument Serif', Georgia, serif",
+              }}>
+                Detailed Diagnosis & 30 day plan
+              </h3>
+              <p style={{
+                margin: 0,
+                fontSize: 14,
+                color: "rgba(255, 255, 255, 0.55)",
+                lineHeight: 1.6,
+                fontFamily: "'Inter', system-ui, sans-serif",
+                maxWidth: 460,
+              }}>
+                Top 3 priorities with severity scores, recommended service tailored to your situation, and concrete action you can start Monday — delivered to your inbox
+              </p>
+            </div>
+
+            {/* ── Form column ── */}
+            <div style={{
+              padding: isMobile ? "32px 24px" : "44px 36px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+              justifyContent: "center",
+              background: "#0F0F0F",
+            }}>
+              {/* BRANDHERO wordmark — centered */}
+              <img
+                src="/logo/logo.png"
+                alt="BrandHero"
+                style={{
+                  width: 120,
+                  height: "auto",
+                  marginBottom: 18,
+                  alignSelf: "center",
+                }}
+              />
+
+              {/* Email form */}
+              {!sent ? (
+                <form onSubmit={onSendEmail} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <input
+                    type="email"
+                    placeholder="YOUR EMAIL"
+                    value={contact.email}
+                    onChange={(e) => setContact((c) => ({ ...c, email: e.target.value }))}
+                    required
+                    style={{
+                      padding: "16px 18px",
+                      background: "#1a1818",
+                      border: "1px solid rgba(255, 255, 255, 0.06)",
+                      borderRadius: 6,
+                      color: "#ffffff",
+                      fontSize: 12,
+                      outline: "none",
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                      fontFamily: "'Geist Mono', ui-monospace, monospace",
+                      transition: "border-color 0.2s",
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "rgba(255, 69, 71, 0.5)" }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)" }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sending}
+                    onMouseEnter={(e) => { if (!sending) { e.currentTarget.style.background = "#252222"; playHover() } }}
+                    onMouseLeave={(e) => { if (!sending) e.currentTarget.style.background = "#1a1818" }}
+                    style={{
+                      padding: "16px 18px",
+                      background: "#1a1818",
+                      color: "#ffffff",
+                      border: "1px solid rgba(255, 255, 255, 0.08)",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      letterSpacing: "0.20em",
+                      textTransform: "uppercase",
+                      cursor: sending ? "not-allowed" : "pointer",
+                      opacity: sending ? 0.6 : 1,
+                      fontFamily: "'Geist Mono', ui-monospace, monospace",
+                      transition: "background 0.2s",
+                    }}
+                  >
+                    {sending ? "Sending…" : "Send Report  →"}
+                  </button>
+                  {sendError && (
+                    <div style={{
+                      fontSize: 11,
+                      color: "#ff7a6a",
+                      marginTop: 2,
+                      fontFamily: "'Geist Mono', ui-monospace, monospace",
+                    }}>{sendError}</div>
+                  )}
+                </form>
+              ) : (
+                <div style={{
+                  padding: "16px 18px",
+                  background: "rgba(255, 69, 71, 0.12)",
+                  border: "1px solid rgba(255, 69, 71, 0.30)",
+                  borderRadius: 6,
+                  textAlign: "center",
+                  fontSize: 11,
+                  letterSpacing: "0.18em",
+                  textTransform: "uppercase",
+                  color: "#fff",
+                  fontFamily: "'Geist Mono', ui-monospace, monospace",
+                }}>
+                  ✓ Sent! Check your inbox
+                </div>
+              )}
+
+              {/* Book a 15-min call — light pink CTA */}
+              <a
+                href={CALL_BOOKING_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => playSelect()}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#FFEFE6" }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "#FFD7CC" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  padding: "16px 18px",
+                  background: "#FFD7CC",
+                  color: "#1a1818",
+                  border: "none",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  letterSpacing: "0.20em",
+                  textTransform: "uppercase",
+                  textDecoration: "none",
+                  fontFamily: "'Geist Mono', ui-monospace, monospace",
+                  transition: "background 0.2s",
+                }}
+              >
+                <span style={{
+                  width: 7, height: 7, borderRadius: "50%",
+                  background: "#1a1818",
+                }} />
+                Book a 15 min call
+              </a>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </div>
+  )
+}
+
+/* Individual diagnostic cell — icon + numbered label at top, body text at bottom.
+   Designed as a borderless grid cell (parent grid draws the dividing lines). */
+function ReportCell({ num, label, accent, iconBg, iconBorder, icon, text, isMobile, hasRightBorder }) {
+  return (
+    <motion.div
+      variants={{
+        hidden: { opacity: 0, y: 24 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.7, ease: [0.22, 1, 0.36, 1] } },
+      }}
+      style={{
+        padding: isMobile ? "32px 24px" : "44px 36px",
+        borderRight: hasRightBorder ? "1px solid rgba(255, 255, 255, 0.10)" : "none",
+        borderBottom: isMobile ? "1px solid rgba(255, 255, 255, 0.10)" : "none",
+        minHeight: isMobile ? 200 : 320,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        gap: 60,
+        background: "#0F0F0F",
+      }}
+    >
+      {/* Top row — icon + numbered label */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 14,
+      }}>
+        <div style={{
+          width: 38,
+          height: 38,
+          borderRadius: 8,
+          background: iconBg,
+          border: `1px solid ${iconBorder}`,
+          display: "grid",
+          placeItems: "center",
+          color: accent,
+          flexShrink: 0,
+        }}>
+          {icon}
+        </div>
+        <div style={{
+          fontSize: 12,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          fontWeight: 500,
+          color: accent,
+          fontFamily: "'Geist Mono', ui-monospace, monospace",
+        }}>
+          {num} — {label}
+        </div>
+      </div>
+
+      {/* Bottom — diagnostic text */}
+      <p style={{
+        margin: 0,
+        fontSize: isMobile ? 14 : 15.5,
+        lineHeight: 1.55,
+        color: "rgba(255, 255, 255, 0.88)",
+        fontFamily: "'Inter', system-ui, sans-serif",
+        fontWeight: 400,
+      }}>
+        {text}
+      </p>
+    </motion.div>
+  )
+}
+
+/* ─── ReportSection icons (inline SVG, currentColor = accent) ─── */
+function WarningIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3 L22 20 L2 20 Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 10 L12 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="0.9" fill="currentColor" />
+    </svg>
+  )
+}
+function SqrtIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M3 14 L6.5 19 L12 5 L21 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+function MoveIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3 L12 21 M3 12 L21 12 M9 6 L12 3 L15 6 M9 18 L12 21 L15 18 M6 9 L3 12 L6 15 M18 9 L21 12 L18 15"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 /* ---------------- HERO PARTICLES — ambient drifting dots (Section 1 background) ---------------- */
+/* ---------------- IMMERSIVE BACKGROUND ----------------
+   Multi-layer atmospheric backdrop for the hero section. Pure CSS + framer-motion,
+   GPU-composited, no canvas. Sits at z-index 0 (deepest layer, behind the 3D canvas
+   and particles). All layers use `pointer-events: none` so they never block interaction.
+
+   Layer stack:
+     1. Heartbeat halo — slow pulsing red glow behind the device area (sync to diagnostic vibe)
+     2. Drifting plasma blobs — large soft red circles that wander very slowly (depth)
+     3. Sonar pulse rings — concentric rings expanding from the device origin (scanner pings)
+     4. Scanner sweep — thin red gradient bar slowly traversing top→bottom (futuristic detector)
+*/
+function ImmersiveBackground({ isMobile = false }) {
+  return (
+    <>
+      {/* 1. Heartbeat halo — slow pulse synced to "diagnostic engine" theme */}
+      <motion.div
+        aria-hidden="true"
+        animate={{
+          opacity: [0.55, 1, 0.55],
+          scale: [1, 1.08, 1],
+        }}
+        transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "radial-gradient(ellipse 45% 55% at 65% 50%, rgba(255, 69, 71, 0.28) 0%, transparent 60%)",
+          transformOrigin: "65% 50%",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform, opacity",
+        }}
+      />
+
+      {/* 2a. Drifting plasma blob — upper-left, very slow wander */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{
+            x: ["-8%", "10%", "-8%"],
+            y: ["-6%", "8%", "-6%"],
+          }}
+          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+          style={{
+            position: "absolute",
+            width: "55vw",
+            height: "60vh",
+            top: "-12vh",
+            left: "-12vw",
+            background: "radial-gradient(circle, rgba(255, 69, 71, 0.10) 0%, transparent 60%)",
+            filter: "blur(70px)",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "transform",
+          }}
+        />
+      )}
+
+      {/* 2b. Drifting plasma blob — lower-right, counter-motion for depth */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{
+            x: ["8%", "-10%", "8%"],
+            y: ["6%", "-10%", "6%"],
+          }}
+          transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
+          style={{
+            position: "absolute",
+            width: "50vw",
+            height: "55vh",
+            bottom: "-10vh",
+            right: "-10vw",
+            background: "radial-gradient(circle, rgba(255, 110, 80, 0.08) 0%, transparent 60%)",
+            filter: "blur(60px)",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "transform",
+          }}
+        />
+      )}
+
+      {/* 3a. Sonar pulse ring — scanner ping expanding from device area */}
+      <motion.div
+        aria-hidden="true"
+        animate={{
+          scale: [0.35, 1.5],
+          opacity: [0, 0.35, 0],
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeOut",
+          times: [0, 0.15, 1],
+        }}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "65%",
+          width: 720,
+          height: 720,
+          marginLeft: -360,
+          marginTop: -360,
+          borderRadius: "50%",
+          border: "1px solid rgba(255, 69, 71, 0.35)",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform, opacity",
+        }}
+      />
+
+      {/* 3b. Second sonar ring — staggered 2.5s for continuous "pulsing detector" feel */}
+      <motion.div
+        aria-hidden="true"
+        animate={{
+          scale: [0.35, 1.5],
+          opacity: [0, 0.25, 0],
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeOut",
+          delay: 2.5,
+          times: [0, 0.15, 1],
+        }}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "65%",
+          width: 720,
+          height: 720,
+          marginLeft: -360,
+          marginTop: -360,
+          borderRadius: "50%",
+          border: "1px solid rgba(255, 110, 80, 0.28)",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform, opacity",
+        }}
+      />
+
+      {/* 4. Scanner sweep — vertical bar slowly traversing top→bottom */}
+      <motion.div
+        aria-hidden="true"
+        initial={{ y: "-50%" }}
+        animate={{ y: "150%" }}
+        transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: "28vh",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(255, 69, 71, 0.035) 40%, rgba(255, 69, 71, 0.06) 50%, rgba(255, 69, 71, 0.035) 60%, transparent 100%)",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform",
+        }}
+      />
+
+      {/* 5. God-ray volumetric beam — descending from top-right, mimics overhead spotlight */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{ opacity: [0.45, 0.75, 0.45] }}
+          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+          style={{
+            position: "absolute",
+            top: -60,
+            right: "10%",
+            width: 320,
+            height: "130vh",
+            background: "linear-gradient(180deg, rgba(255, 130, 110, 0.13) 0%, rgba(255, 69, 71, 0.05) 45%, transparent 100%)",
+            transform: "rotate(14deg) skew(-6deg)",
+            transformOrigin: "top center",
+            filter: "blur(30px)",
+            mixBlendMode: "screen",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "opacity",
+          }}
+        />
+      )}
+
+      {/* 6. Second god-ray — opposite side, slimmer, gives asymmetric volumetric depth */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{ opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 7.5, repeat: Infinity, ease: "easeInOut", delay: 1.2 }}
+          style={{
+            position: "absolute",
+            top: -50,
+            left: "18%",
+            width: 220,
+            height: "110vh",
+            background: "linear-gradient(180deg, rgba(255, 90, 90, 0.10) 0%, transparent 75%)",
+            transform: "rotate(-16deg)",
+            transformOrigin: "top center",
+            filter: "blur(34px)",
+            mixBlendMode: "screen",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "opacity",
+          }}
+        />
+      )}
+
+      {/* 7. Perspective grid floor — futuristic studio chamber floor receding to horizon */}
+      {!isMobile && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: "-10%",
+            right: "-10%",
+            height: "32vh",
+            background: `
+              linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.3) 30%, transparent 75%),
+              repeating-linear-gradient(0deg, transparent 0px, transparent 42px, rgba(255, 69, 71, 0.20) 42px, rgba(255, 69, 71, 0.20) 43px),
+              repeating-linear-gradient(90deg, transparent 0px, transparent 64px, rgba(255, 69, 71, 0.13) 64px, rgba(255, 69, 71, 0.13) 65px)
+            `,
+            transform: "perspective(380px) rotateX(62deg)",
+            transformOrigin: "bottom center",
+            pointerEvents: "none",
+            zIndex: 0,
+            opacity: 0.5,
+            maskImage: "radial-gradient(ellipse 80% 100% at 50% 100%, #000 30%, transparent 80%)",
+            WebkitMaskImage: "radial-gradient(ellipse 80% 100% at 50% 100%, #000 30%, transparent 80%)",
+          }}
+        />
+      )}
+
+      {/* 8. Lens flare horizontal streak — bright thin band cutting through device area */}
+      <motion.div
+        aria-hidden="true"
+        animate={{
+          opacity: [0.25, 0.55, 0.25],
+          scaleX: [0.92, 1.08, 0.92],
+        }}
+        transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "15%",
+          right: "5%",
+          height: 2,
+          transform: "translateY(-50%)",
+          background: "linear-gradient(90deg, transparent 0%, rgba(255, 110, 80, 0) 10%, rgba(255, 130, 110, 0.55) 50%, rgba(255, 69, 71, 0) 90%, transparent 100%)",
+          filter: "blur(2px)",
+          mixBlendMode: "screen",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform, opacity",
+        }}
+      />
+
+      {/* 9. Periodic energy streak — bright horizontal pulse races across at intervals */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{
+            opacity: [0, 0, 0.85, 0.85, 0],
+            x: ["-25%", "-25%", "25%", "85%", "125%"],
+          }}
+          transition={{
+            duration: 8.5,
+            times: [0, 0.78, 0.83, 0.88, 0.93],
+            repeat: Infinity,
+            ease: "linear",
+          }}
+          style={{
+            position: "absolute",
+            top: "32%",
+            left: 0,
+            width: "120%",
+            height: 1.5,
+            background: "linear-gradient(90deg, transparent 0%, rgba(255, 130, 110, 0.85) 50%, transparent 100%)",
+            filter: "blur(1.8px)",
+            mixBlendMode: "screen",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "transform, opacity",
+          }}
+        />
+      )}
+
+      {/* 10. Second energy streak — offset timing + opposite vertical position for variety */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden="true"
+          animate={{
+            opacity: [0, 0, 0.7, 0.7, 0],
+            x: ["125%", "125%", "75%", "15%", "-25%"],
+          }}
+          transition={{
+            duration: 11,
+            times: [0, 0.85, 0.89, 0.93, 0.98],
+            repeat: Infinity,
+            ease: "linear",
+            delay: 4,
+          }}
+          style={{
+            position: "absolute",
+            top: "68%",
+            left: 0,
+            width: "120%",
+            height: 1.2,
+            background: "linear-gradient(90deg, transparent 0%, rgba(255, 90, 90, 0.7) 50%, transparent 100%)",
+            filter: "blur(1.6px)",
+            mixBlendMode: "screen",
+            pointerEvents: "none",
+            zIndex: 0,
+            willChange: "transform, opacity",
+          }}
+        />
+      )}
+
+      {/* 11. Core emission point — small bright glow at device origin (lens flare focal) */}
+      <motion.div
+        aria-hidden="true"
+        animate={{
+          opacity: [0.4, 0.85, 0.4],
+          scale: [0.85, 1.15, 0.85],
+        }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "65%",
+          width: 180,
+          height: 180,
+          marginLeft: -90,
+          marginTop: -90,
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255, 130, 110, 0.35) 0%, rgba(255, 69, 71, 0.15) 30%, transparent 70%)",
+          filter: "blur(20px)",
+          mixBlendMode: "screen",
+          pointerEvents: "none",
+          zIndex: 0,
+          willChange: "transform, opacity",
+        }}
+      />
+    </>
+  )
+}
+
 function HeroParticles({ count = 36 }) {
   const particles = useMemo(() => {
     return Array.from({ length: count }, (_, i) => ({
@@ -2806,8 +3946,8 @@ function HeroParticles({ count = 36 }) {
             width: p.size,
             height: p.size,
             borderRadius: "50%",
-            background: "#FF5252",
-            boxShadow: `0 0 ${p.size * 3}px rgba(255, 82, 82, 0.7)`,
+            background: "#FF4547",
+            boxShadow: `0 0 ${p.size * 3}px rgba(255, 69, 71, 0.7)`,
             opacity: p.opacity,
             animation: `particle-float ${p.duration}s ease-in-out ${p.delay}s infinite`,
             "--drift": `${p.drift}px`,
@@ -2829,7 +3969,6 @@ export default function App() {
   const [error, setError] = useState(null)
   const [lastAnswers, setLastAnswers] = useState(null)
   const [showResult, setShowResult] = useState(false)
-  const [showProjects, setShowProjects] = useState(false)
 
   // Email-form state on output device
   const [contact, setContact] = useState({ name: "", email: "" })
@@ -2843,6 +3982,13 @@ export default function App() {
   const outputSectionRef = useRef(null)
   const servicesSectionRef = useRef(null)
 
+  // Hero bg video transition — controls the cinematic submit → video → report flow.
+  // Phases: 'idle' (quiz active, video paused on poster frame)
+  //         'playing' (hero faded out, video playing through)
+  //         'ended' (video finished, report visible in same hero area)
+  const [videoPhase, setVideoPhase] = useState("idle")
+  const heroVideoRef = useRef(null)
+
   // Increment to force a fresh QuizUI mount (clears internal step state)
   const [quizKey, setQuizKey] = useState(0)
 
@@ -2851,21 +3997,94 @@ export default function App() {
   const [quizStarted, setQuizStarted] = useState(false)
   const handleQuizStart = useCallback(() => setQuizStarted(true), [])
 
+  // ── Tracked async resources — cleared on unmount or on cancel-prone actions ───────
+  // Holds all pending setTimeout IDs so we can clear them on unmount / Reset / Skip.
+  const pendingTimersRef = useRef(new Set())
+  // Holds the cancel function returned by smoothScrollToElement so we can abort scrolls.
+  const pendingScrollRef = useRef(null)
+  // AbortController for in-flight generate fetch — Reset can cancel it.
+  const generateAbortRef = useRef(null)
+  // AbortController for in-flight send-email fetch.
+  const sendEmailAbortRef = useRef(null)
+  // True dedupe for double-clicks — closure-based `sending` check has a race.
+  const sendingRef = useRef(false)
+  // Tracks whether the component is still mounted (set false on unmount).
+  const isMountedRef = useRef(true)
+
+  // Helper to schedule a tracked timeout (auto-cleaned)
+  const scheduleTimeout = useCallback((fn, ms) => {
+    const id = setTimeout(() => {
+      pendingTimersRef.current.delete(id)
+      if (isMountedRef.current) fn()
+    }, ms)
+    pendingTimersRef.current.add(id)
+    return id
+  }, [])
+
+  // Helper to start a tracked smooth scroll (auto-cancels previous in-flight scroll)
+  const startScroll = useCallback((targetGetter, opts) => {
+    if (pendingScrollRef.current) pendingScrollRef.current()   // cancel any in-flight scroll
+    pendingScrollRef.current = smoothScrollToElement(targetGetter, opts)
+  }, [])
+
+  // Skip diagnosis — unlocks scroll + cinematic-scrolls user past the hero to services.
+  const handleSkipDiagnosis = useCallback(() => {
+    playSelect()
+    setQuizStarted(false)   // unlocks body scroll
+    // Tiny delay so the overflow unlock has applied before scroll fires
+    scheduleTimeout(() => {
+      startScroll(() => servicesSectionRef.current, {
+        delay: 0,
+        duration: 1800,
+      })
+    }, 80)
+  }, [scheduleTimeout, startScroll])
+
   // 🔒 Body scroll behavior:
   //   • Initial load                    → UNLOCKED (user can browse all sections freely)
   //   • User starts answering quiz      → LOCKED (must submit to unlock again)
   //   • User submits (showResult=true)  → UNLOCKED again
-  //
-  // NOTE: explicit "auto" (not "") is required to override the CSS `body { overflow: hidden }`
-  // rule that prevents the scrollbar-flash on initial load.
   useEffect(() => {
     if (quizStarted && !showResult) {
-      // User mid-quiz — force them to finish (or reset) before browsing
-      document.body.style.overflow = "hidden"
+      document.body.style.overflowY = "hidden"
     } else {
-      document.body.style.overflow = "auto"
+      document.body.style.overflowY = "auto"
+    }
+    return () => {
+      // On unmount, restore default so we don't leave the body in a locked state.
+      document.body.style.overflowY = ""
     }
   }, [quizStarted, showResult])
+
+  // ── Single unmount cleanup — clears every tracked timer, scroll, fetch ────────────
+  // IMPORTANT: re-mark as mounted on every effect run because React strict mode
+  // mounts → unmounts → re-mounts in dev. The cleanup sets isMountedRef=false during
+  // the strict-mode unmount, but the ref persists across the re-mount. We must
+  // explicitly set it back to true here so async state updates work after re-mount.
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      pendingTimersRef.current.forEach((id) => clearTimeout(id))
+      pendingTimersRef.current.clear()
+      if (pendingScrollRef.current) pendingScrollRef.current()
+      if (generateAbortRef.current) generateAbortRef.current.abort()
+      if (sendEmailAbortRef.current) sendEmailAbortRef.current.abort()
+    }
+  }, [])
+
+  // ── Watchdog: force-clear stuck loading state after 50s no matter what.
+  // Belt-and-suspenders backup for the 45s fetch-abort — if anything else jams,
+  // user still gets unstuck instead of staring at a frozen spinner forever.
+  useEffect(() => {
+    if (!loading) return
+    const wd = setTimeout(() => {
+      console.warn("[watchdog] loading stuck >50s — force-clearing")
+      setLoading(false)
+      if (!report && !error) setError("Request timed out. Please try again.")
+    }, 50000)
+    return () => clearTimeout(wd)
+  }, [loading, report, error])
 
   const handleGenerate = useCallback(async (answers) => {
     setLastAnswers(answers)
@@ -2874,32 +4093,96 @@ export default function App() {
     setReport(null)
     setSent(false)
     setContact({ name: "", email: "" })
-    setShowResult(true)
 
-    // Cinematic scroll: gentle beat (transmission confirmation) → very slow luxurious glide.
-    smoothScrollToElement(() => outputSectionRef.current, {
-      delay: 900,        // small breath so user reads "REPORT TRANSMITTED ✓"
-      duration: 3000,    // 3s with easeInOutQuint — feels like a film cut
-    })
+    // 🎬 NEW FLOW — no scroll. Instead:
+    // 1) Wait for the device spin animation (~1.6s) + brief pause so the "REPORT TRANSMITTED"
+    //    screen is visible for a beat
+    // 2) Trigger hero fade-out (CSS, 0.7s) + start playing the bg video
+    // 3) Video onEnded handler sets showResult=true → report appears in the hero area
+    scheduleTimeout(() => {
+      setVideoPhase("playing")
+      const v = heroVideoRef.current
+      if (v) {
+        try { v.currentTime = 2 } catch { /* ignore */ }   // Skip the first 2s
+        v.playbackRate = 1   // Natural speed — smoothest playback, no rate-change buffering
+        v.play().catch(() => {
+          // Autoplay blocked or video missing — skip straight to report
+          setVideoPhase("ended")
+          setShowResult(true)
+        })
+      } else {
+        // Video element missing — fall back to immediate report
+        setVideoPhase("ended")
+        setShowResult(true)
+      }
+    }, 1800)
+
+    // 45s timeout-with-abort, tracked so Reset/unmount cancels in-flight request
+    const controller = new AbortController()
+    generateAbortRef.current = controller
+    const timeoutId = scheduleTimeout(() => controller.abort(), 45000)
 
     try {
+      console.log("[generate] POST /api/generate")
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
+      pendingTimersRef.current.delete(timeoutId)
+      console.log("[generate] response:", res.status, res.headers.get("content-type"))
+
+      const contentType = res.headers.get("content-type") || ""
+      if (!contentType.includes("application/json")) {
+        throw new Error(`Server didn't return JSON. Are you running 'vercel dev'?`)
+      }
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         throw new Error(errBody.error || `HTTP ${res.status}`)
       }
       const json = await res.json()
-      setReport(json.report)
+      console.log("[generate] ✓ report received")
+      if (isMountedRef.current && generateAbortRef.current === controller) {
+        setReport(json.report)
+      }
     } catch (e) {
-      setError(e.message || "Something went wrong")
+      // Ignore abort — caller (Reset/unmount) is intentionally cancelling.
+      if (e?.name === "AbortError") {
+        console.log("[generate] aborted")
+        return
+      }
+      console.error("[generate] ✗", e?.message)
+      if (isMountedRef.current && generateAbortRef.current === controller) {
+        setError(e?.message || "Something went wrong")
+      }
     } finally {
+      // Always clear loading, regardless of mount state or token match — prevents
+      // the spinner from getting stuck if the controller/ref got swapped mid-flight.
       setLoading(false)
+      if (generateAbortRef.current === controller) {
+        generateAbortRef.current = null
+      }
     }
-  }, [])
+  }, [scheduleTimeout])
+
+  // Bg video time-update — fires every frame the video plays.
+  // When there are 5 seconds left, trigger the report reveal (scale-in animation).
+  const handleVideoTimeUpdate = useCallback(() => {
+    const v = heroVideoRef.current
+    if (!v || !v.duration || isNaN(v.duration)) return
+    const remaining = v.duration - v.currentTime
+    if (remaining <= 5 && !showResult) {
+      setShowResult(true)
+    }
+  }, [showResult])
+
+  // Bg video onEnded handler — finalizes the hero → report transition.
+  const handleVideoEnded = useCallback(() => {
+    setVideoPhase("ended")
+    if (!showResult) setShowResult(true)   // safety in case timeupdate didn't fire
+  }, [showResult])
 
   const handleRetry = useCallback(() => {
     if (lastAnswers) handleGenerate(lastAnswers)
@@ -2907,32 +4190,54 @@ export default function App() {
 
   const handleReset = useCallback(() => {
     playSelect()
-    // Smooth scroll back to the top first
-    smoothScrollToElement(() => document.body, { delay: 0, duration: 1800 })
-    // Clear all state shortly after the scroll begins so the user sees the hero re-emerge clean
-    setTimeout(() => {
+    // Cancel in-flight fetches so they can't restore stale state after reset
+    if (generateAbortRef.current) {
+      generateAbortRef.current.abort()
+      generateAbortRef.current = null
+    }
+    if (sendEmailAbortRef.current) {
+      sendEmailAbortRef.current.abort()
+      sendEmailAbortRef.current = null
+    }
+    sendingRef.current = false
+    // Reset bg video — pause + rewind to the 2s start mark
+    if (heroVideoRef.current) {
+      heroVideoRef.current.pause()
+      try { heroVideoRef.current.currentTime = 2 } catch { /* ignore */ }
+      heroVideoRef.current.playbackRate = 1
+    }
+    setVideoPhase("idle")
+    // Tracked timer — auto-cleared on unmount
+    scheduleTimeout(() => {
       setReport(null)
       setLoading(false)
       setError(null)
       setLastAnswers(null)
       setShowResult(false)
-      setShowProjects(false)
       setContact({ name: "", email: "" })
       setSent(false)
       setSending(false)
       setSendError(null)
       setQuizStarted(false)      // clear quiz-in-progress flag → unlocks scroll
       setQuizKey((k) => k + 1)   // remount QuizUI → resets to step 1
-    }, 1900)
-  }, [])
+    }, 900)
+  }, [scheduleTimeout])
 
   const handleSendEmail = useCallback(async (e) => {
     e?.preventDefault?.()
     if (!contact.email.trim() || !report) return
-    if (sending) return
+    // Ref-based dedupe — closure-captured `sending` can fail under fast double-clicks
+    if (sendingRef.current) return
+    sendingRef.current = true
     playSelect()
     setSending(true)
     setSendError(null)
+
+    // 30s timeout + abort, tracked for cleanup
+    const controller = new AbortController()
+    sendEmailAbortRef.current = controller
+    const timeoutId = scheduleTimeout(() => controller.abort(), 30000)
+
     try {
       const res = await fetch("/api/send-report", {
         method: "POST",
@@ -2942,36 +4247,53 @@ export default function App() {
           name: (contact.name || "").trim() || "there",
           report,
         }),
+        signal: controller.signal,
       })
+      clearTimeout(timeoutId)
+      pendingTimersRef.current.delete(timeoutId)
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         throw new Error(errBody.error || `HTTP ${res.status}`)
       }
+      if (!isMountedRef.current || sendEmailAbortRef.current !== controller) return
       setSent(true)
 
       // 🎉 Success popup — show, then hide report section after popup auto-dismisses
       setShowSuccessPopup(true)
-      setTimeout(() => {
+      scheduleTimeout(() => {
         setShowSuccessPopup(false)
         // Wait for popup fade-out before hiding report section + resetting state
-        setTimeout(() => {
+        scheduleTimeout(() => {
           setShowResult(false)
           setReport(null)
           setSent(false)
           setContact({ name: "", email: "" })
           setSendError(null)
-          setQuizStarted(false)         // unlocks scroll, hero is fresh
-          setQuizKey((k) => k + 1)      // remount QuizUI back to step 1
-          // Smooth-scroll back up to hero so user lands cleanly
-          smoothScrollToElement(() => document.body, { delay: 0, duration: 1500 })
+          setQuizStarted(false)
+          setQuizKey((k) => k + 1)
+          // Reset bg video + phase so hero returns to quiz state.
+          // Rewind to 2s skip-point so paused poster frame matches.
+          if (heroVideoRef.current) {
+            heroVideoRef.current.pause()
+            try { heroVideoRef.current.currentTime = 2 } catch { /* ignore */ }
+          }
+          setVideoPhase("idle")
         }, 600)
       }, 3500)
     } catch (err) {
-      setSendError(err.message || "Failed to send")
+      if (err?.name === "AbortError") return   // intentional cancel
+      if (isMountedRef.current && sendEmailAbortRef.current === controller) {
+        setSendError(err?.name === "AbortError" ? "Request timed out" : (err?.message || "Failed to send"))
+      }
     } finally {
+      sendingRef.current = false
+      // Always clear sending so the button can't get stuck disabled
       setSending(false)
+      if (sendEmailAbortRef.current === controller) {
+        sendEmailAbortRef.current = null
+      }
     }
-  }, [contact, report, sending])
+  }, [contact, report, scheduleTimeout, startScroll])
 
   const canvasGl = {
     toneMapping: THREE.ACESFilmicToneMapping,
@@ -2987,31 +4309,59 @@ export default function App() {
       {/* Floating music toggle — top-right corner, persists across all sections */}
       <MusicToggle />
 
-      {/* SECTION 1: INPUT device (always visible at top) */}
-      <section className="scene-section is-input">
-        <HeroParticles count={isMobile ? 18 : 36} />
-        {/* Canvas wrapper — desktop pre-quiz: shifted RIGHT (heading occupies left).
-            Once quiz starts → glides back to center. Mobile: always centered. */}
-        <motion.div
-          initial={false}
-          animate={{
-            x: !isMobile && !quizStarted ? "18%" : "0%",
+      {/* SECTION 1: INPUT device (always visible at top).
+          Class `hero-fading` triggers a CSS fade-out of all hero content (except the bg video). */}
+      <section className={`scene-section is-input${videoPhase !== "idle" ? " hero-fading" : ""}`}>
+        {/* Bg video — paused on poster frame during quiz, plays through on submit,
+            after onEnded the hero transitions to the report state in-place. */}
+        <video
+          ref={heroVideoRef}
+          src="/bg/bg-video.mp4"
+          /* No poster image — section background-color shows briefly during video load,
+             then the video's own 2s frame appears (set via onLoadedMetadata). */
+          muted
+          playsInline
+          preload="auto"
+          onEnded={handleVideoEnded}
+          onTimeUpdate={handleVideoTimeUpdate}
+          /* Seek to the 2-second mark as soon as the video's metadata loads — so
+             the paused frame shown in the hero is from that point, not the very start. */
+          onLoadedMetadata={(e) => {
+            try { e.currentTarget.currentTime = 2 } catch { /* ignore */ }
           }}
-          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            objectPosition: "center center",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+
+        {/* === HERO_BG_EFFECTS: ImmersiveBackground + HeroParticles — restore with "restore hero bg effects" === */}
+        {/* <ImmersiveBackground isMobile={isMobile} /> */}
+        {/* <HeroParticles count={isMobile ? 10 : 22} /> */}
+        {/* Canvas wrapper — device locked to RIGHT side on desktop (heading occupies left).
+            Mobile: stays centered. No animation, fixed position. */}
+        <div
           style={{
             position: "absolute",
             inset: 0,
             zIndex: 2,
+            transform: isMobile ? "translateX(0)" : "translateX(28%)",
           }}
         >
           <Canvas
-            shadows
             camera={{
               position: isMobile ? [0, 0.05, 3.6] : [0.7, 0.35, 2.5],
               fov: isMobile ? 48 : 38,
             }}
             gl={canvasGl}
-            dpr={[1, 2]}
+            dpr={isMobile ? [1, 1.5] : [1, 2]}
+            style={{ touchAction: "pan-y" }}
           >
             <InputScene
               onGenerate={handleGenerate}
@@ -3022,61 +4372,249 @@ export default function App() {
               isMobile={isMobile}
             />
           </Canvas>
-        </motion.div>
+        </div>
 
         {/* ─── HERO OVERLAYS (text + brand pill on top of the 3D canvas) ─── */}
 
-        {/* Top-left brand pill */}
-        <motion.div
+        {/* Top-left brand mark — bare logo image, no container, no background */}
+        <motion.img
+          src="/logo/logo.png"
+          alt="BrandHero"
           initial={{ opacity: 0, y: -12, filter: "blur(8px)" }}
           animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.9, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: "absolute",
-            top: isMobile ? 14 : 24,
-            left: isMobile ? 14 : 32,
+            top: isMobile ? 10 : 18,
+            left: isMobile ? 10 : 24,
+            width: isMobile ? 80 : 120,
+            height: isMobile ? 80 : 120,
+            objectFit: "contain",
             zIndex: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: isMobile ? 6 : 10,
-            padding: isMobile ? "6px 12px 6px 8px" : "8px 16px 8px 12px",
-            background: "rgba(255, 255, 255, 0.06)",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            borderRadius: 999,
             pointerEvents: "none",
+            display: "block",
           }}
-        >
-          <div style={{
-            width: isMobile ? 18 : 22,
-            height: isMobile ? 18 : 22,
-            borderRadius: "50%",
-            background: "linear-gradient(135deg, #FF5252 0%, #a8201d 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: isMobile ? 9 : 11, fontWeight: 700, color: "#fff",
-            boxShadow: "0 0 12px rgba(255, 82, 82, 0.4)",
-          }}>✦</div>
-          <span style={{ fontSize: isMobile ? 11 : 13, color: "#ffffff", fontWeight: 500, letterSpacing: "0.01em" }}>
-            BrandHero
-          </span>
-          {!isMobile && (
-            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", fontWeight: 400 }}>
-              Strategy Diagnostic
-            </span>
-          )}
-        </motion.div>
+        />
 
-        {/* Headline — bottom-left default; lifts up slightly when quiz starts (parallel to gadget centering) */}
+        {/* === HERO_BG_EFFECTS: HUD corner brackets — restore with "restore hero bg effects" === */}
+        {/*
+        {!isMobile && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1.2, delay: 0.6 }}
+              style={{
+                position: "absolute",
+                top: 22,
+                left: 22,
+                width: 28,
+                height: 28,
+                borderTop: "1px solid rgba(255, 69, 71, 0.55)",
+                borderLeft: "1px solid rgba(255, 69, 71, 0.55)",
+                boxShadow: "inset 1px 1px 8px rgba(255, 69, 71, 0.12)",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1.2, delay: 0.6 }}
+              style={{
+                position: "absolute",
+                top: 22,
+                right: 22,
+                width: 28,
+                height: 28,
+                borderTop: "1px solid rgba(255, 69, 71, 0.55)",
+                borderRight: "1px solid rgba(255, 69, 71, 0.55)",
+                boxShadow: "inset -1px 1px 8px rgba(255, 69, 71, 0.12)",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1.2, delay: 0.75 }}
+              style={{
+                position: "absolute",
+                bottom: 22,
+                left: 22,
+                width: 28,
+                height: 28,
+                borderBottom: "1px solid rgba(255, 69, 71, 0.55)",
+                borderLeft: "1px solid rgba(255, 69, 71, 0.55)",
+                boxShadow: "inset 1px -1px 8px rgba(255, 69, 71, 0.12)",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            />
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 1.2, delay: 0.75 }}
+              style={{
+                position: "absolute",
+                bottom: 22,
+                right: 22,
+                width: 28,
+                height: 28,
+                borderBottom: "1px solid rgba(255, 69, 71, 0.55)",
+                borderRight: "1px solid rgba(255, 69, 71, 0.55)",
+                boxShadow: "inset -1px -1px 8px rgba(255, 69, 71, 0.12)",
+                zIndex: 5,
+                pointerEvents: "none",
+              }}
+            />
+          </>
+        )}
+        */}
+
+        {/* Tiny system-text micro-detail (top-left under logo on desktop) */}
+        {!isMobile && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              position: "absolute",
+              top: 150,
+              left: 32,
+              zIndex: 6,
+              pointerEvents: "none",
+              textAlign: "left",
+              fontFamily: "'Geist Mono', ui-monospace, monospace",
+              fontSize: 9,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "rgba(255, 69, 71, 0.55)",
+              lineHeight: 1.7,
+            }}
+          >
+            <div>SYS_01 · BRAND DIAGNOSTIC</div>
+            <div style={{ color: "rgba(255, 255, 255, 0.3)" }}>v 1.0 · LIVE</div>
+          </motion.div>
+        )}
+
+        {/* Skip + Reset pills — only visible while quiz is in progress (before report) */}
+        <AnimatePresence>
+          {quizStarted && !showResult && (
+            <motion.div
+              key="quiz-controls"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                position: "absolute",
+                bottom: isMobile ? 18 : 32,
+                // Mobile: centered horizontally. Desktop: align under the device (right-shifted canvas).
+                left: isMobile ? "50%" : "auto",
+                right: isMobile ? "auto" : "10%",
+                transform: isMobile ? "translateX(-50%)" : "none",
+                zIndex: 11,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              {/* Reset — restart quiz from Q1 */}
+              <button
+                onClick={handleReset}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"
+                  e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"
+                  e.currentTarget.style.color = "#ffffff"
+                  playHover()
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+                  e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"
+                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)"
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: isMobile ? "7px 12px" : "9px 14px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  borderRadius: 999,
+                  fontSize: isMobile ? 10 : 11,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontWeight: 500,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "rgba(255, 255, 255, 0.7)",
+                  cursor: "pointer",
+                  transition: "background 0.2s, color 0.2s, border-color 0.2s",
+                }}
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+                Reset
+              </button>
+
+              {/* Skip — jump straight to services section */}
+              <button
+                onClick={handleSkipDiagnosis}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.12)"
+                  e.currentTarget.style.color = "#ffffff"
+                  playHover()
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)"
+                  e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)"
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: isMobile ? "7px 14px" : "9px 18px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  borderRadius: 999,
+                  fontSize: isMobile ? 10 : 11,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                  fontWeight: 500,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "rgba(255, 255, 255, 0.7)",
+                  cursor: "pointer",
+                  transition: "background 0.2s, color 0.2s, border-color 0.2s",
+                }}
+              >
+                Skip
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Headline — mobile: TOP. Desktop: vertically centered, nudged ~110px UP so the
+            full stack (tag → heading → subheading → badge) reads as visually centered with
+            the device — not weighted toward the bottom. */}
         <motion.div
           initial={false}
-          animate={{
-            y: !isMobile && quizStarted ? -120 : 0,
-          }}
+          animate={{ y: 0 }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: "absolute",
-            bottom: isMobile ? 56 : 56,
+            top: isMobile ? 80 : "50%",
+            bottom: isMobile ? "auto" : "auto",
+            transform: isMobile ? "none" : "translateY(calc(-50% - 200px))",
             left: isMobile ? 20 : 32,
             right: isMobile ? 20 : "auto",
             zIndex: 10,
@@ -3085,62 +4623,105 @@ export default function App() {
             textAlign: "left",
           }}
         >
-          <AnimatedHeadline />
-
-          {/* Subheading — sits directly below the headline (left-aligned, narrow) */}
-          <div style={{ marginTop: isMobile ? 14 : 18, maxWidth: isMobile ? "100%" : 460 }}>
-            <AnimatedTagline
-              text="Take the guesswork out of growing your brand. Identify what's blocking you, get a custom strategy, and move faster than ever."
-              delay={0.5}
-              style={{
-                fontSize: isMobile ? 13 : 14,
-                color: "rgba(255, 255, 255, 0.6)",
-                lineHeight: 1.55,
-                fontWeight: 400,
-              }}
-            />
-          </div>
-
+          {/* Top tag — clean red uppercase label, sits above the headline (matches reference pattern) */}
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 1.5, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.6, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
             style={{
-              marginTop: isMobile ? 16 : 22,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
+              marginBottom: isMobile ? 12 : 18,
               fontSize: isMobile ? 10 : 11,
-              color: "rgba(255, 255, 255, 0.5)",
-              letterSpacing: "0.16em",
+              color: "#FF4547",
+              letterSpacing: "0.18em",
               textTransform: "uppercase",
               fontWeight: 500,
+              fontFamily: "'Geist Mono', ui-monospace, monospace",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
             }}
           >
             <span style={{
-              width: 6, height: 6, borderRadius: "50%",
-              background: "#FF5252",
-              boxShadow: "0 0 10px #FF5252",
-              animation: "pulse 2s ease-in-out infinite",
+              display: "inline-block",
+              width: 24,
+              height: 1,
+              background: "#FF4547",
+              boxShadow: "0 0 8px rgba(255, 69, 71, 0.8)",
             }} />
             Answer to discover
           </motion.div>
-        </motion.div>
-      </section>
 
-      {/* SECTION 2: OUTPUT device — only mounts after user performs diagnose (clicks Generate) */}
-      {showResult && (
-        <section className="scene-section is-output" ref={outputSectionRef}>
-          <Canvas
-            shadows
-            camera={{
-              position: isMobile ? [0, 0.05, 5.4] : [0, 0.1, 4.0],
-              fov: isMobile ? 56 : 46,
+          <AnimatedHeadline />
+
+          {/* Subheading — desktop: directly below headline. Mobile: rendered separately at bottom. */}
+          {!isMobile && (
+            <div style={{ marginTop: 18, maxWidth: 460 }}>
+              <AnimatedTagline
+                text="Every great brand has a turning point. Diagnose what's holding yours back, get a custom strategy, and rise faster than the ones you're competing against."
+                delay={0.5}
+                style={{
+                  fontSize: 16,
+                  color: "rgba(255, 255, 255, 0.65)",
+                  lineHeight: 1.55,
+                  fontWeight: 400,
+                  fontFamily: "'Inter', system-ui, sans-serif",
+                }}
+              />
+            </div>
+          )}
+
+          {/* ─── DIAGNOSIS ENGINE status badge — desktop only (mobile renders it below in its own block) ─── */}
+          {!isMobile && <DiagnosisEngineBadge isMobile={false} />}
+        </motion.div>
+
+        {/* Mobile-only subheading + badge — sits directly below the device, center-aligned */}
+        {isMobile && (
+          <div style={{
+            position: "absolute",
+            bottom: 24,
+            left: 20,
+            right: 20,
+            zIndex: 10,
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 14,
+          }}>
+            <AnimatedTagline
+              text="Every great brand has a turning point. Diagnose what's holding yours back, get a custom strategy, and rise faster than the ones you're competing against."
+              delay={0.5}
+              style={{
+                fontSize: 14,
+                color: "rgba(255, 255, 255, 0.65)",
+                lineHeight: 1.55,
+                fontWeight: 400,
+                fontFamily: "'Inter', system-ui, sans-serif",
+              }}
+            />
+            <DiagnosisEngineBadge isMobile={true} />
+          </div>
+        )}
+
+        {/* Report overlay — appears INSIDE the hero section starting ~5s before video ends.
+            Scales from 0 → 100% over 2s. Transparent container; individual grid cells are filled. */}
+        {showResult && (
+          <motion.div
+            className="hero-report-overlay"
+            ref={outputSectionRef}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 2, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              overflowY: "auto",
+              background: "transparent",
+              transformOrigin: "center center",
             }}
-            gl={canvasGl}
-            dpr={[1, 2]}
           >
-            <OutputScene
+            <ReportSection
               report={report}
               loading={loading}
               error={error}
@@ -3152,59 +4733,23 @@ export default function App() {
               sendError={sendError}
               onSendEmail={handleSendEmail}
               isMobile={isMobile}
+              onReset={handleReset}
             />
-          </Canvas>
+          </motion.div>
+        )}
+      </section>
 
-          {/* Reset button — visible since this section only renders post-diagnose */}
-          <motion.button
-            onClick={handleReset}
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255, 82, 82, 0.18)"; e.currentTarget.style.borderColor = "rgba(255, 82, 82, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
-            style={{
-              position: "absolute",
-              top: isMobile ? 14 : 24,
-              left: isMobile ? 14 : 32,
-              zIndex: 20,
-              display: "flex",
-              alignItems: "center",
-              gap: isMobile ? 6 : 8,
-              padding: isMobile ? "8px 14px" : "10px 16px",
-              background: "rgba(255, 255, 255, 0.04)",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              borderRadius: 999,
-              fontSize: 12,
-              fontFamily: "'Inter Tight', system-ui, sans-serif",
-              fontWeight: 500,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: "rgba(255, 255, 255, 0.7)",
-              cursor: "pointer",
-              transition: "all 0.25s cubic-bezier(0.22, 1, 0.36, 1)",
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="1 4 1 10 7 10" />
-              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-            </svg>
-            Start Over
-          </motion.button>
-        </section>
-      )}
-
-      {/* SECTION 3: SERVICES (What We Do) — always rendered for initial scrollability */}
+      {/* SECTION 3 & 4 — TEMPORARILY DISABLED (perf: heavy images on initial load).
+          To re-enable, uncomment the blocks below. */}
+      {/*
       <section className="services-wrap is-services" ref={servicesSectionRef}>
         <ServicesSection />
       </section>
 
-      {/* SECTION 4: SUCCESS STORIES (Works portfolio grid) — always rendered */}
       <section className="services-wrap is-stories">
         <SuccessStoriesSection />
       </section>
+      */}
     </>
   )
 }

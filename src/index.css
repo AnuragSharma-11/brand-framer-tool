@@ -2,33 +2,39 @@ html, body, #root {
   margin: 0;
   width: 100%;
   font-family: system-ui, sans-serif;
-  /* Dark base color — applied before gradient loads, prevents white flash on refresh */
-  background-color: #050309;
   /* Always block horizontal overflow — multiple decorative elements (canvas transform,
      halftone bg, particles) intentionally extend past viewport edges */
   overflow-x: hidden;
+  /* Ensure mobile vertical scroll works regardless of nested touch-action rules */
+  touch-action: pan-y;
 }
 
-/* Lock body scroll at load — hero is 100vh, no scroll needed.
-   App.jsx unlocks/re-locks programmatically when Section 2 / 3 reveal. */
-body {
-  overflow: hidden;
+/* Flash-prevention fallback lives ONLY on html. body holds the real gradient,
+   and #root must stay transparent so the gradient shows through React content. */
+html {
+  background-color: #050202;
+}
+#root {
+  background: transparent;
 }
 
-/* Animated atmospheric background — subtle breathing radial gradient */
+html, body {
+  /* Make sure scrolling container has correct sizing on mobile */
+  min-height: 100%;
+}
+
+/* NOTE: body overflow is JS-controlled now (quiz-started lock).
+   Don't lock here statically — would block mobile scrolling on initial paint. */
+
+/* Hero background — focused red HALO positioned behind the device area for clean rim/backlight,
+   with the rest of the viewport sitting in deep atmospheric dark so the 3D model pops cleanly.
+   Layer 1: small soft red glow at 65% 50% (behind device on desktop, slightly right of center on mobile).
+   Layer 2: deep dark base with subtle red-tinted center → black corners (atmospheric depth, never flat). */
 body {
   background:
-    radial-gradient(ellipse 60% 50% at 50% 0%, #3a1a1a 0%, transparent 70%),
-    radial-gradient(ellipse 80% 60% at 50% 100%, #2a0e0e 0%, transparent 70%),
-    linear-gradient(180deg, #0e0807 0%, #050309 100%);
+    radial-gradient(ellipse 50% 60% at 65% 50%, rgba(255, 69, 71, 0.40) 0%, rgba(255, 69, 71, 0.10) 32%, transparent 65%),
+    radial-gradient(ellipse 120% 120% at 50% 50%, #1a0606 0%, #0a0303 55%, #050202 100%);
   background-attachment: fixed;
-  background-size: 100% 200%, 100% 200%, 100% 100%;
-  animation: ambient-shift 18s ease-in-out infinite;
-}
-
-@keyframes ambient-shift {
-  0%, 100% { background-position: 50% 0%, 50% 100%, 0 0; }
-  50%      { background-position: 60% 5%,  40% 95%, 0 0; }
 }
 
 #root {
@@ -40,11 +46,52 @@ section.scene-section {
   width: 100%;
   position: relative;
   overflow: hidden;
+  /* Allow vertical scroll-through on mobile so canvas touches don't trap scroll. */
+  touch-action: pan-y;
 }
 
-/* Section 2 cinematic mount reveal — fades up + scales in (longer + softer for luxury feel) */
-section.scene-section.is-output {
-  animation: section-reveal 2.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Hero section background — just a dark solid fallback; the <video> element handles
+   the actual bg image (its poster frame). No bg image needed on the section now. */
+section.scene-section.is-input {
+  background-color: #050202;
+}
+
+/* Hero fade-out — when bg video is playing (videoPhase !== 'idle'),
+   smoothly fade out every direct child except the video itself and the report overlay. */
+section.scene-section.is-input.hero-fading > *:not(video):not(.hero-report-overlay) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* Report overlay animation now handled by framer-motion (scale 0 → 1 over 2s)
+   when showResult flips true, ~6s before the bg video ends. */
+
+
+/* Section 2 cinematic mount reveal — fades up + scales in.
+   Applies to both old (3D Canvas) and new (DOM ReportSection) section variants. */
+section.scene-section.is-output,
+section.services-wrap.is-output {
+  animation: section-reveal 1.0s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* DOM-based report section — fill viewport so loading state isn't a tiny strip */
+section.services-wrap.is-output {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Global keyframes used by ReportSection's loading spinner and pulsing label.
+   Previously these were scoped inside ResultUI's <style> tag — moved out so the
+   DOM-based ReportSection can use them too. */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
 }
 
 /* Section 3 (projects) — same cinematic reveal pattern */
@@ -73,19 +120,39 @@ section.scene-section.is-input {
   100% { opacity: 1; }
 }
 
-/* Subtle floating particles overlay (purist atmospheric haze) */
+/* === HERO_BG_EFFECTS: ::before haze + ::after scanlines/vignette — restore with "restore hero bg effects" === */
+/*
 section.scene-section::before {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(230, 61, 43, 0.06) 0%, transparent 40%),
-    radial-gradient(circle at 80% 70%, rgba(230, 61, 43, 0.05) 0%, transparent 40%);
+    radial-gradient(circle at 20% 30%, rgba(255, 69, 71, 0.06) 0%, transparent 40%),
+    radial-gradient(circle at 80% 70%, rgba(255, 69, 71, 0.05) 0%, transparent 40%);
   mix-blend-mode: screen;
   animation: haze-drift 14s ease-in-out infinite alternate;
   z-index: 1;
 }
+
+section.scene-section.is-input::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(ellipse 100% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.4) 100%);
+  opacity: 0.6;
+}
+*/
 
 @keyframes haze-drift {
   0%   { transform: translate(0, 0); }
@@ -96,6 +163,18 @@ canvas {
   display: block;
   position: relative;
   z-index: 2;
+  /* Allow vertical scroll-through on mobile — single-finger swipe should scroll body,
+     not be consumed by Three.js / OrbitControls. */
+  touch-action: pan-y;
+}
+
+/* Drop shadow on the hero canvas — projects a soft shadow from the 3D device's
+   silhouette onto the bg.png behind it, giving the model weight and grounding it.
+   Layered (close+far) shadows for natural soft-AO look. Only applied to hero section. */
+section.scene-section.is-input canvas {
+  filter:
+    drop-shadow(0 8px 18px rgba(0, 0, 0, 0.45))
+    drop-shadow(0 28px 50px rgba(0, 0, 0, 0.55));
 }
 
 /* Smooth scroll fallback (custom JS animation handles the actual cinematic scroll) */
@@ -140,13 +219,26 @@ section.services-wrap.is-services {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* Hero particles — slow drifting + twinkle */
+/* Hero particles — slow drifting + twinkle. `will-change` hints the GPU to
+   keep these on a compositor layer so they don't trigger main-thread repaints. */
 @keyframes particle-float {
   0%   { transform: translate(0, 0)              scale(0.6); opacity: 0; }
   20%  { opacity: 1; }
   50%  { transform: translate(var(--drift, 8px), -22px) scale(1); opacity: 1; }
   80%  { opacity: 1; }
   100% { transform: translate(0, -44px)          scale(0.6); opacity: 0; }
+}
+
+/* GPU-accelerated animation containers — push to compositor layer for smooth FPS */
+@media (prefers-reduced-motion: no-preference) {
+  /* Stop ambient body gradient animation when document isn't visible (tab switch) */
+  body { will-change: background-position; }
+}
+
+/* Respect reduced-motion preference — turn off ambient infinite animations */
+@media (prefers-reduced-motion: reduce) {
+  body { animation: none; }
+  section.scene-section::before { animation: none; }
 }
 
 /* Custom global scrollbar — premium subtle */
@@ -161,8 +253,22 @@ section.services-wrap.is-services {
 * { scrollbar-width: thin; scrollbar-color: rgba(230, 61, 43, 0.2) transparent; }
 
 /* ─────────────────────────────────────────────────────────
-   MOBILE / RESPONSIVE OVERRIDES (< 768px)
+   MOBILE / RESPONSIVE OVERRIDES
    ───────────────────────────────────────────────────────── */
+
+/* Global guardrails — prevent horizontal overflow on every screen size */
+* { max-width: 100%; box-sizing: border-box; }
+img, video { max-width: 100%; height: auto; }
+
+/* Tablet / small-desktop (768–1024px) — pull max-widths in a notch */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .hero-report-overlay > div {
+    padding-left: 32px !important;
+    padding-right: 32px !important;
+  }
+}
+
+/* Mobile (< 768px) */
 @media (max-width: 767px) {
   /* Hide thin scrollbar on mobile — touch scroll preferred */
   ::-webkit-scrollbar { width: 0; }
@@ -174,11 +280,36 @@ section.services-wrap.is-services {
       radial-gradient(circle at 70% 70%, rgba(230, 61, 43, 0.03) 0%, transparent 40%);
   }
 
+  /* Reduced drop-shadow on mobile canvas (perf + cleaner look on small screens) */
+  section.scene-section.is-input canvas {
+    filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4));
+  }
+
   /* Tighter section reveal on mobile (smaller translateY) */
   @keyframes section-reveal {
     0%   { opacity: 0; transform: translateY(28px) scale(0.96); filter: blur(10px); }
     60%  { opacity: 0.7; }
     100% { opacity: 1; transform: translateY(0)    scale(1);    filter: blur(0); }
+  }
+
+  /* Touch-friendly minimum tap targets — applies to most interactive elements */
+  button, a[role="button"], input[type="submit"], input[type="button"] {
+    min-height: 44px;
+  }
+
+  /* Inputs full width on mobile so they don't overflow */
+  input[type="email"], input[type="text"], input[type="url"] {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Very small mobile (< 380px) — Galaxy Fold, etc. */
+@media (max-width: 379px) {
+  section.scene-section.is-input canvas {
+    /* Canvas needs to scale further down so device doesn't overflow */
+    transform: scale(0.92);
+    transform-origin: center center;
   }
 }
 

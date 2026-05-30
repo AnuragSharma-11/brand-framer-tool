@@ -13,7 +13,10 @@
       "Bash(OPENAI_API_KEY=test RESEND_API_KEY=test GOOGLE_API_KEY=test node -e \"import\\('./api/generate.js'\\).then\\(\\(\\)=>console.log\\('✓ generate ok'\\)\\).catch\\(e=>console.error\\('✗',e.message\\)\\)\")",
       "Bash(RESEND_API_KEY=test node -e \"import\\('./api/send-report.js'\\).then\\(\\(\\)=>console.log\\('✓ send-report ok'\\)\\).catch\\(e=>console.error\\('✗',e.message\\)\\)\")",
       "Bash(npm install *)",
-      "Bash(vercel --version)"
+      "Bash(vercel --version)",
+      "Bash(npx eslint *)",
+      "Bash(node -e ' *)",
+      "Bash(grep -v \"^Calling\\\\|^Effects\\\\|^\\\\\\\\* \\\\|cascading renders\\\\|external systems\\\\|effect body\\\\|impure function\\\\|^$\\\\|^>\\\\|^   [0-9]+ \\\\|\")"
     ]
   }
 }

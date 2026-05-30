@@ -26,6 +26,25 @@ const CONTACT = {
   phoneTel: "+919876543210",                                  // 👈 same number, no spaces (for tel: link)
 }
 
+// 🛡 Simple in-memory rate limiter — caps abuse on the public Resend endpoint.
+// Per IP: max 5 sends per 10-minute window. Resets when window expires.
+// NOTE: In-memory works for a single Vercel function instance. For real production
+// use a shared store (Upstash Redis / Vercel KV) so the limit holds across cold-start instances.
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
+const RATE_LIMIT_MAX = 5
+const rateBucket = new Map()
+function checkRateLimit(ip) {
+  const now = Date.now()
+  const entry = rateBucket.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS }
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + RATE_LIMIT_WINDOW_MS }
+  entry.count++
+  rateBucket.set(ip, entry)
+  return entry.count <= RATE_LIMIT_MAX
+}
+
+// RFC 5322 basic email regex — good enough to reject obvious garbage like "abc"
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." })
@@ -35,11 +54,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server misconfigured: RESEND_API_KEY missing." })
   }
 
+  // Rate-limit by client IP (Vercel forwards real IP in x-forwarded-for)
+  const ip = (req.headers["x-forwarded-for"] || "").split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: "Too many requests. Please try again in a few minutes." })
+  }
+
   try {
     const { email, name, report } = req.body || {}
 
     if (!email || typeof email !== "string") {
       return res.status(400).json({ error: "Missing or invalid 'email'" })
+    }
+    const trimmedEmail = email.trim()
+    if (!EMAIL_RE.test(trimmedEmail)) {
+      return res.status(400).json({ error: "Invalid email format" })
+    }
+    if (trimmedEmail.length > 254) {
+      return res.status(400).json({ error: "Email too long" })
+    }
+    if (typeof name === "string" && name.length > 200) {
+      return res.status(400).json({ error: "Name too long" })
     }
     if (!report || typeof report !== "object") {
       return res.status(400).json({ error: "Missing 'report' object" })
@@ -52,7 +87,7 @@ export default async function handler(req, res) {
       // NOTE: `onboarding@resend.dev` is Resend's test address — works without domain verification.
       // For production / sending to anyone, verify your own domain in Resend dashboard and switch this.
       from: "Brand Framer <onboarding@resend.dev>",
-      to: [email],
+      to: [trimmedEmail],
       subject,
       html,
     })

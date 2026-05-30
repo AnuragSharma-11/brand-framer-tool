@@ -159,6 +159,24 @@ Good priority: "Rebuild your home page around the single use case driving 80% of
 Bad action: "Do market research."
 Good action: "Interview 5 existing customers this week and ask what they almost bought instead. Map the patterns."`
 
+// 🛡 Simple in-memory rate limiter — caps abuse on the paid Gemini endpoint.
+// Per IP: max 10 generations per 10-minute window.
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
+const RATE_LIMIT_MAX = 10
+const rateBucket = new Map()
+function checkRateLimit(ip) {
+  const now = Date.now()
+  const entry = rateBucket.get(ip) || { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS }
+  if (now > entry.resetAt) { entry.count = 0; entry.resetAt = now + RATE_LIMIT_WINDOW_MS }
+  entry.count++
+  rateBucket.set(ip, entry)
+  return entry.count <= RATE_LIMIT_MAX
+}
+
+// Hard cap on per-field length so users can't blow up our prompt → Gemini quota
+const MAX_FIELD_LEN = 1000
+const ALLOWED_FIELDS = ["liveProduct", "industry", "url", "businessAge", "hurt", "need", "recentChange"]
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed. Use POST." })
@@ -168,6 +186,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server misconfigured: GOOGLE_API_KEY missing." })
   }
 
+  // Rate-limit by client IP
+  const ip = (req.headers["x-forwarded-for"] || "").split(",")[0]?.trim() || req.socket?.remoteAddress || "unknown"
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: "Too many requests. Please try again in a few minutes." })
+  }
+
   try {
     const { answers } = req.body || {}
 
@@ -175,7 +199,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing 'answers' object in request body" })
     }
 
-    const userMessage = formatUserMessage(answers)
+    // Sanitize: build a clean answers object containing only known fields, each capped in length.
+    // Drops anything else the client sent (prevents prompt injection via unknown keys).
+    const safeAnswers = {}
+    for (const k of ALLOWED_FIELDS) {
+      const v = answers[k]
+      if (typeof v === "string") safeAnswers[k] = v.slice(0, MAX_FIELD_LEN)
+    }
+
+    const userMessage = formatUserMessage(safeAnswers)
 
     // Append CUSTOM_INSTRUCTIONS to the base system prompt (if provided)
     const customTrim = (CUSTOM_INSTRUCTIONS || "").trim()

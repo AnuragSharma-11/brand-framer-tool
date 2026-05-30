@@ -1,19 +1,21 @@
 <!doctype html>
-<html lang="en" style="background:#050309;">
+<html lang="en" style="background:#050202;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#050309" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
+    <meta name="theme-color" content="#050202" />
     <title>brand-framer-tool</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Inter+Tight:wght@200;300;400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@300;400;500;600&display=swap" rel="stylesheet" />
     <style>
-      /* Prevent white flash before CSS / React loads */
-      html, body { background: #050309 !important; margin: 0; }
+      /* Prevent white flash before CSS / React loads — match the bg's darkest edge color.
+         No !important — let our real CSS gradient take over once stylesheets load. */
+      html { background-color: #050202; margin: 0; }
+      body { background-color: #050202; margin: 0; }
     </style>
   </head>
-  <body style="background:#050309;">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
