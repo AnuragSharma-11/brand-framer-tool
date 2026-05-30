@@ -163,9 +163,9 @@ canvas {
   display: block;
   position: relative;
   z-index: 2;
-  /* Allow vertical scroll-through on mobile — single-finger swipe should scroll body,
-     not be consumed by Three.js / OrbitControls. */
-  touch-action: pan-y;
+  /* `none` lets OrbitControls capture single-finger drag gestures for rotation
+     on both desktop and mobile — matches the desktop interaction behavior. */
+  touch-action: none;
 }
 
 /* Drop shadow on the hero canvas — projects a soft shadow from the 3D device's

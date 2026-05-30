@@ -1782,13 +1782,16 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         makeDefault
         enableZoom={false}
         enablePan={false}
-        enableRotate={!isMobile}
+        enableRotate={true}
         enableDamping
         dampingFactor={0.08}
-        rotateSpeed={0.7}
+        rotateSpeed={isMobile ? 1.0 : 0.7}
         minPolarAngle={Math.PI / 3.5}
         maxPolarAngle={Math.PI / 1.8}
         target={[deviceX, deviceY, 0]}
+        /* Mobile touch: single-finger rotation (no zoom, no pan).
+           This requires canvas touch-action to allow horizontal/rotational gestures. */
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.ROTATE }}
       />
     </>
   )
@@ -4361,7 +4364,7 @@ export default function App() {
             }}
             gl={canvasGl}
             dpr={isMobile ? [1, 1.5] : [1, 2]}
-            style={{ touchAction: "pan-y" }}
+            style={{ touchAction: "none" }}
           >
             <InputScene
               onGenerate={handleGenerate}
