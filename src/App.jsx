@@ -2870,7 +2870,7 @@ function AnimatedHeadline() {
       animate="show"
       style={{
         margin: 0,
-        fontSize: "clamp(34px, 5.5vw, 72px)",
+        fontSize: "clamp(36px, 6vw, 84px)",
         lineHeight: 1.05,
       }}
     >
@@ -4385,10 +4385,10 @@ export default function App() {
           transition={{ duration: 0.9, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: "absolute",
-            top: isMobile ? 10 : 18,
-            left: isMobile ? 10 : 24,
-            width: isMobile ? 80 : 120,
-            height: isMobile ? 80 : 120,
+            top: "clamp(10px, 1.5vh, 22px)",
+            left: "clamp(10px, 1.5vw, 28px)",
+            width: "clamp(64px, 8vw, 130px)",
+            height: "clamp(64px, 8vw, 130px)",
             objectFit: "contain",
             zIndex: 10,
             pointerEvents: "none",
@@ -4472,7 +4472,7 @@ export default function App() {
         )}
         */}
 
-        {/* Tiny system-text micro-detail (top-left under logo on desktop) */}
+        {/* Tiny system-text micro-detail (top-left under logo on desktop + tablet) */}
         {!isMobile && (
           <motion.div
             initial={{ opacity: 0, y: -4 }}
@@ -4480,13 +4480,13 @@ export default function App() {
             transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
             style={{
               position: "absolute",
-              top: 150,
-              left: 32,
+              top: "clamp(120px, 14vh, 170px)",
+              left: "clamp(16px, 3vw, 40px)",
               zIndex: 6,
               pointerEvents: "none",
               textAlign: "left",
               fontFamily: "'Geist Mono', ui-monospace, monospace",
-              fontSize: 9,
+              fontSize: "clamp(8px, 0.7vw, 10px)",
               letterSpacing: "0.18em",
               textTransform: "uppercase",
               color: "rgba(255, 69, 71, 0.55)",
@@ -4603,22 +4603,21 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        {/* Headline — mobile: TOP. Desktop: vertically centered, nudged ~110px UP so the
-            full stack (tag → heading → subheading → badge) reads as visually centered with
-            the device — not weighted toward the bottom. */}
+        {/* Headline — mobile: TOP. Desktop: vertically centered, lifted with clamp() so
+            it never falls off-screen on short laptops while still feeling centered on big monitors. */}
         <motion.div
           initial={false}
           animate={{ y: 0 }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: "absolute",
-            top: isMobile ? 80 : "50%",
-            bottom: isMobile ? "auto" : "auto",
-            transform: isMobile ? "none" : "translateY(calc(-50% - 200px))",
-            left: isMobile ? 20 : 32,
-            right: isMobile ? 20 : "auto",
+            top: isMobile ? "max(70px, env(safe-area-inset-top, 0px) + 60px)" : "50%",
+            bottom: "auto",
+            transform: isMobile ? "none" : "translateY(calc(-50% - clamp(80px, 14vh, 200px)))",
+            left: "clamp(16px, 3vw, 48px)",
+            right: isMobile ? "clamp(16px, 3vw, 48px)" : "auto",
             zIndex: 10,
-            maxWidth: isMobile ? "calc(100% - 40px)" : "55%",
+            maxWidth: isMobile ? "calc(100% - clamp(32px, 6vw, 96px))" : "min(55%, 720px)",
             pointerEvents: "none",
             textAlign: "left",
           }}
