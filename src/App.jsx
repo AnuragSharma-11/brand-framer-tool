@@ -4359,8 +4359,9 @@ export default function App() {
         >
           <Canvas
             camera={{
-              position: isMobile ? [0, 0.05, 3.6] : [0.7, 0.35, 2.5],
-              fov: isMobile ? 48 : 38,
+              // Mobile: camera moved closer + tighter FOV so the 3D device fills the viewport
+              position: isMobile ? [0, 0.05, 2.4] : [0.7, 0.35, 2.5],
+              fov: isMobile ? 42 : 38,
             }}
             gl={canvasGl}
             dpr={isMobile ? [1, 1.5] : [1, 2]}
