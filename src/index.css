@@ -262,9 +262,14 @@ img, video { max-width: 100%; height: auto; display: block; }
 input, button, textarea, select { font: inherit; }
 html, body { overflow-x: clip; max-width: 100vw; }
 
-/* Make sure interactive elements get a proper tap target on touch devices */
+/* Make sure interactive elements get a proper tap target on touch devices.
+   Only applies to elements without explicit aspect-ratio or fixed dimensions,
+   so circular icon buttons (e.g. MusicToggle) keep their 1:1 ratio. */
 @media (hover: none) and (pointer: coarse) {
-  button, a, input[type="submit"], input[type="button"], [role="button"] {
+  button:not([style*="aspect-ratio"]):not([style*="border-radius: 50%"]),
+  a:not([style*="aspect-ratio"]):not([style*="border-radius: 50%"]),
+  input[type="submit"], input[type="button"],
+  [role="button"]:not([style*="aspect-ratio"]):not([style*="border-radius: 50%"]) {
     min-height: 44px;
   }
 }

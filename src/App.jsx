@@ -189,8 +189,10 @@ function MusicToggle() {
           bottom: 18,
           right: 18,
           zIndex: 1000,
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
+          minWidth: 44,
+          aspectRatio: "1 / 1",
           borderRadius: "50%",
           border: `1px solid ${playing ? "rgba(255, 82, 82, 0.6)" : "rgba(255, 255, 255, 0.15)"}`,
           background: playing
@@ -4318,8 +4320,8 @@ export default function App() {
       {/* Success popup — overlays everything when report is sent */}
       <ReportSentPopup visible={showSuccessPopup} />
 
-      {/* Floating music toggle — top-right corner, persists across all sections */}
-      <MusicToggle />
+      {/* === MUSIC_TOGGLE: disabled — restore with "restore music toggle" === */}
+      {/* <MusicToggle /> */}
 
       {/* SECTION 1: INPUT device (always visible at top).
           Class `hero-fading` triggers a CSS fade-out of all hero content (except the bg video). */}

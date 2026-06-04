@@ -3,7 +3,19 @@
 
 import { GoogleGenAI, Type } from "@google/genai"
 
-const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
+// Lazy init so module loads even when env is missing / SDK init throws.
+// Without this, any FUNCTION_INVOCATION_FAILED at cold-start cascades into a 500
+// for the entire serverless function (even unrelated routes via the same handler).
+let _ai = null
+function getAI() {
+  if (!_ai) {
+    if (!process.env.GOOGLE_API_KEY) {
+      throw new Error("Server misconfigured: GOOGLE_API_KEY missing.")
+    }
+    _ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
+  }
+  return _ai
+}
 
 /* ════════════════════════════════════════════════════════════════════════
  * 🎛️  CUSTOM INSTRUCTIONS — edit this freely to control the report
@@ -215,7 +227,7 @@ export default async function handler(req, res) {
       ? `${SYSTEM_PROMPT}\n\n# Additional rules (highest priority — override anything above if conflict)\n${customTrim}`
       : SYSTEM_PROMPT
 
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: "gemini-2.5-flash",
       contents: userMessage,
       config: {

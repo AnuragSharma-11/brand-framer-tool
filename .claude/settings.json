@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check api/generate.js)",
+      "Bash(node --check api/send-report.js)",
+      "Bash(kill %1)"
+    ]
+  }
+}
