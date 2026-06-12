@@ -1589,7 +1589,7 @@ function Device({
               visibility: isBackFacing ? "hidden" : "visible",
               transition: "opacity 0.15s",
               backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden"
+              WebkitBackfaceVisibility: "hidden",
             }}
           >
             {children}
@@ -1793,16 +1793,20 @@ function InputScene({ onGenerate, onStart, loading, spinRef, quizKey = 0, isMobi
         enablePan={false}
         enableRotate={true}
         enableDamping
-        dampingFactor={isMobile ? 0.12 : 0.08}
-        rotateSpeed={isMobile ? 0.45 : 0.7}
-        /* Constrain vertical drag tighter on mobile so the model can't flip past
-           viewer-friendly angles when fingers wander. */
+        /* Touch fast-spin fix:
+           1. `dampingFactor: 0.25` on mobile → kills swipe momentum almost immediately,
+              so the device stops as soon as the finger lifts.
+           2. `rotateSpeed: 0.3` on mobile → halves single-finger sensitivity to match
+              the larger arc a thumb naturally traces on a phone screen.
+           3. `TWO: THREE.TOUCH.DOLLY_PAN` (was ROTATE) → standard two-finger value.
+              With enableZoom + enablePan both false, this makes two-finger touches a no-op
+              instead of triggering a second ROTATE algorithm that doubled the spin speed. */
+        dampingFactor={isMobile ? 0.25 : 0.08}
+        rotateSpeed={isMobile ? 0.3 : 0.7}
         minPolarAngle={isMobile ? Math.PI / 2.6 : Math.PI / 3.5}
         maxPolarAngle={isMobile ? Math.PI / 1.95 : Math.PI / 1.8}
         target={[deviceX, deviceY, 0]}
-        /* Mobile touch: single-finger rotation (no zoom, no pan).
-           This requires canvas touch-action to allow horizontal/rotational gestures. */
-        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.ROTATE }}
+        touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
       />
     </>
   )
@@ -3043,7 +3047,7 @@ function ReportSection({ report, loading, error, onRetry, contact, setContact, s
       width: "100%",
       maxWidth: 1400,
       margin: "0 auto",
-      padding: isMobile ? "60px 16px 60px" : "70px 60px 80px",
+      padding: isMobile ? "60px 16px 60px" : "70px 120px 80px",
       boxSizing: "border-box",
       position: "relative",
       zIndex: 3,
@@ -4117,7 +4121,7 @@ export default function App() {
       setVideoPhase("playing")
       const v = heroVideoRef.current
       if (v) {
-        try { v.currentTime = 2 } catch { /* ignore */ }   // Skip the first 2s
+        try { v.currentTime = 1.5 } catch { /* ignore */ }   // Skip the first 1.5s
         v.playbackRate = 1   // Natural speed — smoothest playback, no rate-change buffering
         v.play().catch(() => {
           // Autoplay blocked or video missing — skip straight to report
@@ -4214,27 +4218,32 @@ export default function App() {
       sendEmailAbortRef.current = null
     }
     sendingRef.current = false
-    // Reset bg video — pause + rewind to the 2s start mark
-    if (heroVideoRef.current) {
-      heroVideoRef.current.pause()
-      try { heroVideoRef.current.currentTime = 2 } catch { /* ignore */ }
-      heroVideoRef.current.playbackRate = 1
-    }
-    setVideoPhase("idle")
-    // Tracked timer — auto-cleared on unmount
+
+    // ── PHASE 1: trigger report exit animation immediately ──
+    // AnimatePresence plays the scale-down + fade-out (~0.55s).
+    // videoPhase stays at 'ended' here so hero remains faded BEHIND the report
+    // during exit — prevents "hero peeks through" flash.
+    setShowResult(false)
+
+    // ── PHASE 2: after report exit completes, restore hero state ──
     scheduleTimeout(() => {
+      if (heroVideoRef.current) {
+        heroVideoRef.current.pause()
+        try { heroVideoRef.current.currentTime = 1.5 } catch { /* ignore */ }
+        heroVideoRef.current.playbackRate = 1
+      }
+      setVideoPhase("idle")    // now safe — report is gone, hero fades back in
       setReport(null)
       setLoading(false)
       setError(null)
       setLastAnswers(null)
-      setShowResult(false)
       setContact({ name: "", email: "" })
       setSent(false)
       setSending(false)
       setSendError(null)
       setQuizStarted(false)      // clear quiz-in-progress flag → unlocks scroll
       setQuizKey((k) => k + 1)   // remount QuizUI → resets to step 1
-    }, 900)
+    }, 650)   // ← exit animation 0.55s + small buffer
   }, [scheduleTimeout])
 
   const handleSendEmail = useCallback(async (e) => {
@@ -4341,7 +4350,7 @@ export default function App() {
           /* Seek to the 2-second mark as soon as the video's metadata loads — so
              the paused frame shown in the hero is from that point, not the very start. */
           onLoadedMetadata={(e) => {
-            try { e.currentTarget.currentTime = 2 } catch { /* ignore */ }
+            try { e.currentTarget.currentTime = 1.5 } catch { /* ignore */ }
           }}
           style={{
             position: "absolute",
@@ -4391,7 +4400,8 @@ export default function App() {
 
         {/* ─── HERO OVERLAYS (text + brand pill on top of the 3D canvas) ─── */}
 
-        {/* Top-left brand mark — bare logo image, no container, no background */}
+        {/* === TOP_LEFT_LOGO: disabled — restore with "restore top left logo" === */}
+        {/*
         <motion.img
           src="/logo/logo.png"
           alt="BrandHero"
@@ -4410,6 +4420,7 @@ export default function App() {
             display: "block",
           }}
         />
+        */}
 
         {/* === HERO_BG_EFFECTS: HUD corner brackets — restore with "restore hero bg effects" === */}
         {/*
@@ -4718,39 +4729,48 @@ export default function App() {
         )}
 
         {/* Report overlay — appears INSIDE the hero section starting ~5s before video ends.
-            Scales from 0 → 100% over 2s. Transparent container; individual grid cells are filled. */}
-        {showResult && (
-          <motion.div
-            className="hero-report-overlay"
-            ref={outputSectionRef}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 2, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 20,
-              overflowY: "auto",
-              background: "transparent",
-              transformOrigin: "center center",
-            }}
-          >
-            <ReportSection
-              report={report}
-              loading={loading}
-              error={error}
-              onRetry={handleRetry}
-              contact={contact}
-              setContact={setContact}
-              sent={sent}
-              sending={sending}
-              sendError={sendError}
-              onSendEmail={handleSendEmail}
-              isMobile={isMobile}
-              onReset={handleReset}
-            />
-          </motion.div>
-        )}
+            Scales from 0 → 100% over 2s on enter. On Reset, smoothly fades + scales down
+            (exit animation) before hero re-appears underneath. */}
+        <AnimatePresence>
+          {showResult && (
+            <motion.div
+              key="report-overlay"
+              className="hero-report-overlay"
+              ref={outputSectionRef}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{
+                scale: 0.92,
+                opacity: 0,
+                transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] },
+              }}
+              transition={{ duration: 2, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 20,
+                overflowY: "auto",
+                background: "transparent",
+                transformOrigin: "center center",
+              }}
+            >
+              <ReportSection
+                report={report}
+                loading={loading}
+                error={error}
+                onRetry={handleRetry}
+                contact={contact}
+                setContact={setContact}
+                sent={sent}
+                sending={sending}
+                sendError={sendError}
+                onSendEmail={handleSendEmail}
+                isMobile={isMobile}
+                onReset={handleReset}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       {/* SECTION 3 & 4 — TEMPORARILY DISABLED (perf: heavy images on initial load).

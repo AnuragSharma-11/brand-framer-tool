@@ -18,9 +18,16 @@ html {
   background: transparent;
 }
 
+/* Height chain — critical for Framer embed + iframe contexts.
+   In iframes, 100vh refers to the browser viewport (often wrong); 100% inherits from parent. */
 html, body {
-  /* Make sure scrolling container has correct sizing on mobile */
+  height: 100%;
   min-height: 100%;
+}
+#root {
+  min-height: 100%;
+  /* `100dvh` honours mobile address-bar collapse + falls back gracefully in iframes */
+  min-height: 100dvh;
 }
 
 /* NOTE: body overflow is JS-controlled now (quiz-started lock).
@@ -42,7 +49,15 @@ body {
 }
 
 section.scene-section {
+  /* Layered height fallbacks — works in browsers, mobile, AND Framer/iframe embeds.
+     1. `100vh` for ancient browsers.
+     2. `100%` so when embedded in a Framer container, we fill the parent's height.
+     3. `100dvh` (last) overrides both on modern browsers — dynamic vh accounts for
+     mobile address bar collapse AND iframe height correctly. */
   height: 100vh;
+  height: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
   width: 100%;
   position: relative;
   overflow: hidden;

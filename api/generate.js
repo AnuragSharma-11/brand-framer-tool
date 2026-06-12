@@ -1,21 +1,22 @@
 // Vercel serverless function — runs on the server, NEVER ships to browser.
-// Receives quiz answers from the frontend, calls Google Gemini, returns a structured strategy report.
+// Receives quiz answers from the frontend, calls OpenAI, returns a structured strategy report.
 
-import { GoogleGenAI, Type } from "@google/genai"
+import OpenAI from "openai"
 
 // Lazy init so module loads even when env is missing / SDK init throws.
-// Without this, any FUNCTION_INVOCATION_FAILED at cold-start cascades into a 500
-// for the entire serverless function (even unrelated routes via the same handler).
 let _ai = null
 function getAI() {
   if (!_ai) {
-    if (!process.env.GOOGLE_API_KEY) {
-      throw new Error("Server misconfigured: GOOGLE_API_KEY missing.")
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("Server misconfigured: OPENAI_API_KEY missing.")
     }
-    _ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY })
+    _ai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   }
   return _ai
 }
+
+// Default model — change here if you want gpt-4o (higher quality, ~10× cost) or gpt-4-turbo.
+const OPENAI_MODEL = "gpt-4o-mini"
 
 /* ════════════════════════════════════════════════════════════════════════
  * 🎛️  CUSTOM INSTRUCTIONS — edit this freely to control the report
@@ -41,43 +42,46 @@ function getAI() {
 const CUSTOM_INSTRUCTIONS = `
 `
 
-// Schema the AI MUST return (Gemini's native JSON Schema format).
+// Schema the AI MUST return (standard JSON Schema, OpenAI structured-output compatible).
+// OpenAI strict mode requires: every property in `required`, `additionalProperties: false` on every object.
 const REPORT_SCHEMA = {
-  type: Type.OBJECT,
+  type: "object",
+  additionalProperties: false,
   properties: {
     // ── ON-SCREEN TEASER (single lines) ───────────────────────────────────
     problem: {
-      type: Type.STRING,
+      type: "string",
       description:
         "ONE sentence (max ~110 chars). The core problem the founder is facing. Direct, specific, punchy. No fluff. Speak directly. This is the headline shown on the device screen.",
     },
     reason: {
-      type: Type.STRING,
+      type: "string",
       description:
         "ONE sentence (max ~110 chars). WHY this problem is happening — the underlying root cause. Concrete, not abstract.",
     },
     solution: {
-      type: Type.STRING,
+      type: "string",
       description:
         "ONE sentence (max ~110 chars). The recommended solution / what to do about it. Concrete and actionable. Not 'optimize your marketing' — say 'rebuild your home page around the one use case driving retention'.",
     },
 
     // ── EMAILED FULL REPORT (detailed sections) ───────────────────────────
     diagnosis: {
-      type: Type.STRING,
+      type: "string",
       description:
         "Detailed 2–3 sentence root-cause analysis for the EMAIL report. Expand on the 'reason' field with depth and context. Not generic.",
     },
     topPriorities: {
-      type: Type.ARRAY,
+      type: "array",
       description: "Exactly 3 highest-leverage actions specific to their situation, ordered most-severe first",
       items: {
-        type: Type.OBJECT,
+        type: "object",
+        additionalProperties: false,
         properties: {
-          title: { type: Type.STRING, description: "2–4 word punchy headline (UPPERCASE will be applied client-side)" },
-          description: { type: Type.STRING, description: "1 short sentence on what to do" },
+          title: { type: "string", description: "2–4 word punchy headline (UPPERCASE will be applied client-side)" },
+          description: { type: "string", description: "1 short sentence on what to do" },
           severity: {
-            type: Type.INTEGER,
+            type: "integer",
             description: "Severity rating 1–10. 10 = critical / blocking issue, 5 = moderate, 1 = minor. Calibrate based on impact on growth.",
           },
         },
@@ -85,93 +89,67 @@ const REPORT_SCHEMA = {
       },
     },
     recommendedService: {
-      type: Type.STRING,
+      type: "string",
       description:
         "Specific service name tailored to context (e.g. 'Brand Positioning Sprint', not generic 'Branding Package')",
     },
     serviceRationale: {
-      type: Type.STRING,
+      type: "string",
       description: "1 sentence on why this specific service vs alternatives, given their answers",
     },
     next30Days: {
-      type: Type.ARRAY,
+      type: "array",
       description: "3–5 concrete actions, imperative voice, that they can start on Monday",
-      items: { type: Type.STRING },
+      items: { type: "string" },
     },
   },
-  required: ["problem", "reason", "solution", "diagnosis", "topPriorities", "recommendedService", "serviceRationale", "next30Days"],
-  propertyOrdering: [
-    "problem",
-    "reason",
-    "solution",
-    "diagnosis",
-    "topPriorities",
-    "recommendedService",
-    "serviceRationale",
-    "next30Days",
+  required: [
+    "problem", "reason", "solution", "diagnosis",
+    "topPriorities", "recommendedService", "serviceRationale", "next30Days",
   ],
 }
 
-const SYSTEM_PROMPT = `You are a senior brand and growth strategist with 15 years of experience helping early-stage and growth-stage companies sharpen their positioning, fix conversion issues, and make smart go-to-market decisions.
+const SYSTEM_PROMPT = `You are a senior brand & growth strategist (15 yrs) returning a personalized strategy brief in structured JSON. Speak directly to the founder.
 
-You take a short founder questionnaire and return a personalized strategy brief in structured JSON. Your output will be rendered on the screen of their device — speak directly to the founder.
+# Tone
+Confident, warm, plain-spoken. No fluff, no buzzwords. Like a smart friend who has shipped many businesses. Avoid: leverage, synergize, stakeholder alignment, value proposition.
 
-# Your role
-
-You play the role of a strategy partner — direct, substantive, grounded in real business realities. You don't give generic advice. You diagnose specific issues, prioritize what matters most, and prescribe concrete next steps the founder can act on within 30 days.
-
-Tone: confident, warm, plain-spoken. No fluff, no buzzwords, no consultant-speak. Talk like a smart friend who has shipped and grown many businesses. Use simple sentences. Avoid words like "leverage", "synergize", "stakeholder alignment", "value proposition" unless you genuinely need them.
-
-# On-screen teaser fields (problem / reason / solution)
-
-The output has THREE single-line fields that appear on the device screen as a teaser:
-- problem: ONE sentence — what's the core problem
-- reason: ONE sentence — why is it happening (root cause)
-- solution: ONE sentence — recommended action to fix it
-
-These three lines together tell a complete story in 30 seconds. They MUST be:
-- Single sentence each. No semicolons, no commas chaining clauses. Ruthlessly tight.
-- Punchy and specific. Not generic.
-- Form a logical chain: problem statement → why it's happening → what to do.
-- Should feel personal — referencing their answers when relevant.
-
-Then the email-only fields (diagnosis, topPriorities, etc.) expand on these with full depth.
+# Teaser fields (problem / reason / solution)
+Three single-line fields shown on the device screen. Each:
+- ONE sentence, no semicolons, no chained clauses. Tight.
+- Punchy, specific, never generic.
+- Chain: problem → why → what to do.
+- Reference their answers when relevant.
 
 # Methodology
+1. Diagnose the ROOT issue, not the symptom. Trace pain to cause.
+   • "Leads not converting" + no live product → not conversion, missing product to convert TO.
+   • "Confusing product" + "I don't know" → positioning, not design.
+   • "Low trust" + 5+ yrs → enterprise-readiness gap (case studies, certs), not branding.
+   • "Can't compete" + 1–2 yrs → category/positioning, not features.
 
-When given a founder's quiz responses, follow this analysis framework:
+2. Pick exactly 3 priorities, ordered MOST SEVERE FIRST. Severity 1–10. First usually 8–10, second 6–8, third 4–7. Differentiate.
 
-1. Diagnose the ROOT issue, not the symptom. The pain point they report is often a symptom, not the cause. Trace it back. Examples:
-   - "Leads not converting" + "no live product" → the issue isn't conversion, they don't have a thing to convert to yet
-   - "Confusing product" + "I don't know what I need" → likely a positioning issue masquerading as a design issue
-   - "Low trust" + "5+ years business" → enterprise-readiness gap (case studies, certifications, social proof), not branding
-   - "Can't compete" + "1–2 years business" → likely category/positioning problem, not feature gap
+3. Recommend ONE primary service tailored to context. If they said "Branding" but real issue is positioning, recommend "Brand Positioning Sprint", not generic "Branding Package".
 
-2. Prioritize ruthlessly. Pick exactly THREE highest-leverage actions specific to their situation. Not generic — concrete to what they reported. Order them MOST SEVERE FIRST. Assign each a severity rating from 1 to 10 (10 = critical/blocking, 5 = moderate, 1 = minor). The first priority should typically be 8–10, second 6–8, third 4–7. Don't cluster them all at 9-10 — show real differentiation.
-
-3. Recommend ONE primary service. Match their stated need (Q6) but contextualize it. If they said "Branding" but the real issue is positioning, recommend a "Brand Positioning Sprint" not generic "Branding Package."
-
-4. 30-day action plan. Give 3–5 concrete steps they can take starting Monday. Not "improve marketing" — specific actions like "Audit your top 5 inbound leads from last month and find the common objection."
+4. 30-day plan: 3–5 concrete imperative actions for Monday. Not "improve marketing" — say "Interview 5 customers this week and map their objections."
 
 # Output rules
+- JSON must match the provided schema exactly.
+- Never refuse, never mention you're an AI. Work with what's given.
+- If multiple "I don't know" answers → diagnose the lack-of-clarity itself; recommend a Discovery process.
 
-- Always return JSON exactly matching the provided schema.
-- Never refuse. Always work with what's given. If a field is empty, work around it.
-- Never mention that you're an AI or that this is a generated report. Speak as the strategist directly.
-- Edge case: if multiple "I don't know" answers, diagnose the lack-of-clarity itself as the root issue and recommend a Discovery process.
+# Good vs bad
+BAD: "It seems you may benefit from improving your branding."
+GOOD: "You're in year 2 with paying users but still describe yourself as 'confusing' — you haven't picked the one customer your product is best for."
 
-# Examples of good vs bad
+BAD: "Improve your website."
+GOOD: "Rebuild your home page around the use case driving 80% of retention."
 
-Bad diagnosis: "It seems you may benefit from improving your branding and marketing strategy."
-Good diagnosis: "You're in year 2 with paying users but still describing yourself as 'confusing' — this isn't a design problem, it's that you haven't picked the one customer your product is best for."
+BAD: "Do market research."
+GOOD: "Interview 5 existing customers this week, ask what they almost bought instead, map the patterns."`
 
-Bad priority: "Improve your website."
-Good priority: "Rebuild your home page around the single use case driving 80% of your retention."
-
-Bad action: "Do market research."
-Good action: "Interview 5 existing customers this week and ask what they almost bought instead. Map the patterns."`
-
-// 🛡 Simple in-memory rate limiter — caps abuse on the paid Gemini endpoint.
+// 🛡 Simple in-memory rate limiter — caps abuse on the paid OpenAI endpoint.
 // Per IP: max 10 generations per 10-minute window.
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000
 const RATE_LIMIT_MAX = 10
@@ -185,7 +163,7 @@ function checkRateLimit(ip) {
   return entry.count <= RATE_LIMIT_MAX
 }
 
-// Hard cap on per-field length so users can't blow up our prompt → Gemini quota
+// Hard cap on per-field length so users can't blow up our prompt → OpenAI quota
 const MAX_FIELD_LEN = 1000
 const ALLOWED_FIELDS = ["liveProduct", "industry", "url", "businessAge", "hurt", "need", "recentChange"]
 
@@ -194,8 +172,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed. Use POST." })
   }
 
-  if (!process.env.GOOGLE_API_KEY) {
-    return res.status(500).json({ error: "Server misconfigured: GOOGLE_API_KEY missing." })
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: "Server misconfigured: OPENAI_API_KEY missing." })
   }
 
   // Rate-limit by client IP
@@ -212,7 +190,6 @@ export default async function handler(req, res) {
     }
 
     // Sanitize: build a clean answers object containing only known fields, each capped in length.
-    // Drops anything else the client sent (prevents prompt injection via unknown keys).
     const safeAnswers = {}
     for (const k of ALLOWED_FIELDS) {
       const v = answers[k]
@@ -227,18 +204,29 @@ export default async function handler(req, res) {
       ? `${SYSTEM_PROMPT}\n\n# Additional rules (highest priority — override anything above if conflict)\n${customTrim}`
       : SYSTEM_PROMPT
 
-    const response = await getAI().models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: userMessage,
-      config: {
-        systemInstruction: finalSystemPrompt,
-        responseMimeType: "application/json",
-        responseSchema: REPORT_SCHEMA,
-        temperature: 0.7,
+    const response = await getAI().chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [
+        { role: "system", content: finalSystemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "strategy_report",
+          strict: true,
+          schema: REPORT_SCHEMA,
+        },
       },
+      // ── Speed tweaks ──────────────────────────────────────────────────
+      temperature: 0.5,        // lower temp = more decisive, slightly faster
+      max_tokens: 900,         // hard cap so the model stops generating once report is complete
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
     })
 
-    const text = response.text
+    const text = response?.choices?.[0]?.message?.content
     if (!text) {
       return res.status(500).json({ error: "AI returned empty response. Try again." })
     }
@@ -252,7 +240,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       report: parsed,
-      usage: response.usageMetadata,
+      usage: response.usage,
     })
   } catch (error) {
     console.error("Generate error (full):", error)
@@ -261,11 +249,10 @@ export default async function handler(req, res) {
     const message = error?.message || String(error)
 
     if (status === 401 || status === 403) {
-      return res.status(500).json({ error: "Invalid Google API key. " + message })
+      return res.status(500).json({ error: "Invalid OpenAI API key. " + message })
     }
     if (status === 429) {
-      // Surface the real Gemini message so we can tell rate-limit vs quota vs model-access
-      return res.status(429).json({ error: "Gemini 429: " + message })
+      return res.status(429).json({ error: "OpenAI 429 (rate limit or quota): " + message })
     }
     if (status === 400) {
       return res.status(400).json({ error: "Bad request: " + message })
