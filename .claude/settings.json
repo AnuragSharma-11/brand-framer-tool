@@ -4,7 +4,11 @@
       "Bash(node --check api/generate.js)",
       "Bash(node --check api/send-report.js)",
       "Bash(kill %1)",
-      "Bash(npm uninstall *)"
+      "Bash(npm uninstall *)",
+      "Bash(ls vercel.json)",
+      "Bash(grep -l \"OPENAI_API_KEY\" .env.local .env)",
+      "Bash(grep -c \"OPENAI_API_KEY=sk\" .env.local .env)",
+      "Bash(npx vercel *)"
     ]
   }
 }
