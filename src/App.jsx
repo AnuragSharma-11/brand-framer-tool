@@ -3047,7 +3047,7 @@ function ReportSection({ report, loading, error, onRetry, contact, setContact, s
       width: "100%",
       maxWidth: 1400,
       margin: "0 auto",
-      padding: isMobile ? "60px 16px 60px" : "70px 120px 80px",
+      padding: isMobile ? "60px 16px 60px" : "90px 180px",
       boxSizing: "border-box",
       position: "relative",
       zIndex: 3,
@@ -4498,32 +4498,6 @@ export default function App() {
         )}
         */}
 
-        {/* Tiny system-text micro-detail (top-left under logo on desktop + tablet) */}
-        {!isMobile && (
-          <motion.div
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              position: "absolute",
-              top: "clamp(120px, 14vh, 170px)",
-              left: "clamp(16px, 3vw, 40px)",
-              zIndex: 6,
-              pointerEvents: "none",
-              textAlign: "left",
-              fontFamily: "'Geist Mono', ui-monospace, monospace",
-              fontSize: "clamp(8px, 0.7vw, 10px)",
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "rgba(255, 69, 71, 0.55)",
-              lineHeight: 1.7,
-            }}
-          >
-            <div>SYS_01 · BRAND DIAGNOSTIC</div>
-            <div style={{ color: "rgba(255, 255, 255, 0.3)" }}>v 1.0 · LIVE</div>
-          </motion.div>
-        )}
-
         {/* Skip + Reset pills — only visible while quiz is in progress (before report) */}
         <AnimatePresence>
           {quizStarted && !showResult && (
@@ -4640,7 +4614,7 @@ export default function App() {
             top: isMobile ? "max(70px, env(safe-area-inset-top, 0px) + 60px)" : "50%",
             bottom: "auto",
             transform: isMobile ? "none" : "translateY(calc(-50% - clamp(80px, 14vh, 200px)))",
-            left: "clamp(16px, 3vw, 48px)",
+            left: isMobile ? "clamp(16px, 3vw, 48px)" : "clamp(48px, 9vw, 140px)",
             right: isMobile ? "clamp(16px, 3vw, 48px)" : "auto",
             zIndex: 10,
             maxWidth: isMobile ? "calc(100% - clamp(32px, 6vw, 96px))" : "min(55%, 720px)",
