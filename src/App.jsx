@@ -3052,46 +3052,7 @@ function ReportSection({ report, loading, error, onRetry, contact, setContact, s
       position: "relative",
       zIndex: 3,
     }}>
-      {/* Reset / Start Over pill — top-left */}
-      {onReset && (
-        <motion.button
-          onClick={onReset}
-          initial={{ opacity: 0, x: -16 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"; e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
-          style={{
-            position: "absolute",
-            top: isMobile ? 16 : 28,
-            left: isMobile ? 16 : 32,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: isMobile ? "7px 14px" : "9px 16px",
-            background: "rgba(255, 255, 255, 0.04)",
-            border: "1px solid rgba(255, 255, 255, 0.12)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            borderRadius: 999,
-            fontSize: isMobile ? 10 : 11,
-            fontFamily: "'Inter', system-ui, sans-serif",
-            fontWeight: 500,
-            letterSpacing: "0.14em",
-            textTransform: "uppercase",
-            color: "rgba(255, 255, 255, 0.7)",
-            cursor: "pointer",
-            transition: "background 0.2s, color 0.2s, border-color 0.2s",
-            zIndex: 4,
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-          Start Over
-        </motion.button>
-      )}
+
 
       {/* ─── Header (eyebrow + big heading, centered) ─── */}
       <motion.div
@@ -3486,6 +3447,46 @@ function ReportSection({ report, loading, error, onRetry, contact, setContact, s
             </div>
           </motion.div>
         </>
+      )}
+
+      {/* Reset / Start Over pill — bottom-right */}
+      {onReset && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 32 }}>
+          <motion.button
+            onClick={onReset}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(230, 61, 43, 0.18)"; e.currentTarget.style.borderColor = "rgba(230, 61, 43, 0.5)"; e.currentTarget.style.color = "#ffffff"; playHover() }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)"; e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.12)"; e.currentTarget.style.color = "rgba(255, 255, 255, 0.7)" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: isMobile ? "7px 14px" : "9px 16px",
+              background: "rgba(255, 255, 255, 0.04)",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              borderRadius: 999,
+              fontSize: isMobile ? 10 : 11,
+              fontFamily: "'Inter', system-ui, sans-serif",
+              fontWeight: 500,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: "rgba(255, 255, 255, 0.7)",
+              cursor: "pointer",
+              transition: "background 0.2s, color 0.2s, border-color 0.2s",
+              zIndex: 4,
+            }}
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            Start Over
+          </motion.button>
+        </div>
       )}
     </div>
   )
